@@ -51,21 +51,6 @@ class AccountManager(object):
         self.load()
         self.accounts[account['id']] = account
         self.save()
-        
-    '''
-    def drive_map(self):
-        if not self.accounts:
-            self.accounts = {}
-            for account_id in self.config.sections():
-                account = OneDrive(self.addon.getSetting('client_id_oauth2'))
-                account.account_id = account_id
-                account.event_listener = self.event_listener
-                account.name = self.config.get(account_id, 'name')
-                account.access_token = self.config.get(account_id, 'access_token')
-                account.refresh_token = self.config.get(account_id, 'refresh_token')
-                self.accounts[account_id] = account
-        return self.accounts
-    '''
     
     def account_by_driveid(self, driveid):
         for accountid in self.accounts:
@@ -81,10 +66,6 @@ class AccountManager(object):
                     return drive
         raise DriveNotFoundException()
     
-    def event_listener(self, onedrive, event, obj):
-        if event == 'login_success':
-            self.save(onedrive)
-
     def save(self):
         with open(self._config_path, 'wb') as fo:
             fo.write(json.dumps(self.accounts, sort_keys=True, indent=4))

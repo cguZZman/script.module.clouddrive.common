@@ -28,6 +28,8 @@ from clouddrive.common.remote.signin import Signin
 class Provider(OAuth2):
     name = ''
     _signin = Signin()
+    _account_manager = None
+    _driveid = None
     
     def __init__(self, name):
         self.name = name
@@ -41,13 +43,40 @@ class Provider(OAuth2):
             tokens_info['date'] = time.time()
         return tokens_info
     
-    def refresh_access_tokens(self, request_params={}):
-        pass
+    def configure(self, account_manager, driveid):
+        self._account_manager = account_manager
+        self._driveid = driveid
     
-    def account(self, request_params={}, access_tokens={}):
+    def validate_configuration(self):
+        if not self._account_manager:
+            raise Exception('Account Manager not defined')
+        if not self._driveid:
+            raise Exception('DriveId not defined')
+            
+    def retrieve_access_tokens(self):
+        self.validate_configuration()
+        self._account_manager.load()
+        account = self._account_manager.account_by_driveid(self._driveid)
+        return account['access_tokens']
+    
+    def refresh_access_tokens(self, request_params={}):
+        tokens = self.retrieve_access_tokens()
+        tokens_info = self._signin.refresh_tokens(self.name, tokens['refresh_token'], request_params)
+        if tokens_info:
+            tokens_info['date'] = time.time()
+        return tokens_info
+    
+    def persist_access_tokens(self, access_tokens):
+        self.validate_configuration()
+        self._account_manager.load()
+        account = self._account_manager.account_by_driveid(self._driveid)
+        account['access_tokens'] = access_tokens
+        self._account_manager.add_account(account)
+    
+    def retrieve_account(self, request_params={}, access_tokens={}):
         raise NotImplementedError()
     
-    def drives(self, request_params={}, access_tokens={}):
+    def retrieve_drives(self, request_params={}, access_tokens={}):
         raise NotImplementedError()
     
     def drive_type_name(self, drive_type):

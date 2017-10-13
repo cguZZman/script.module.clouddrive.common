@@ -27,7 +27,6 @@ import urlparse
 
 from clouddrive.common.account import AccountManager
 from clouddrive.common.exception import UIException, ExceptionUtils, RequestException
-from clouddrive.common.remote.signin import Signin
 from clouddrive.common.ui.dialog import DialogProgress, DialogProgressBG
 from clouddrive.common.ui.logger import Logger
 from clouddrive.common.utils import Utils
@@ -53,6 +52,8 @@ class CloudDriveAddon(object):
     _progress_dialog = DialogProgress(_addon_name)
     _progress_dialog_bg = DialogProgressBG(_addon_name)
     _system_monitor = xbmc.Monitor()
+    _video_file_extensions = ['mkv', 'mp4', 'avi', 'iso', 'nut', 'ogg', 'vivo', 'pva', 'nuv', 'nsv', 'nsa', 'fli', 'flc', 'wtv', 'flv']
+    _audio_file_extensions = ['mp3', 'wav', 'flac', 'alac', 'aiff', 'amr', 'ape', 'shn', 's3m', 'nsf', 'spc']
     
     def __init__(self):
         self._addon_url = sys.argv[0]
@@ -73,6 +74,18 @@ class CloudDriveAddon(object):
     def provider(self):
         raise NotImplementedError()
     
+    def my_files_menu_name(self):
+        return self._common_addon.getLocalizedString(32052)
+    
+    def custom_drive_folders(self):
+        return [{'name' : self._common_addon.getLocalizedString(32058), 'folder' : 'shared_with_me'}]
+    
+    def drive_folder_items(self):
+        raise NotImplementedError()
+
+    def folder_items(self):
+        raise NotImplementedError()
+    
     def cancel_operation(self):
         return self._system_monitor.abortRequested() or self._progress_dialog.iscanceled() or self._cancel_operation
 
@@ -83,34 +96,35 @@ class CloudDriveAddon(object):
             account = accounts[account_id]
             size = len(account['drives'])
             for drive in account['drives']:
+                params = {'action':'_remove_account', 'content_type': self._content_type, 'driveid': drive['id']}
+                context_options = [(self._common_addon.getLocalizedString(32006), 'RunPlugin('+self._addon_url + '?' + urllib.urlencode(params)+')')]
+                if size > 1:
+                    params['action'] = '_remove_drive'
+                    cmd =  'RunPlugin('+self._addon_url + '?' + urllib.urlencode(params)+')'
+                    context_options.append((self._common_addon.getLocalizedString(32007), cmd))
+                params['action'] = '_search'
+                params['c'] = time.time()
+                cmd = 'ActivateWindow(%d,%s?%s,return)' % (xbmcgui.getCurrentWindowId(), self._addon_url, urllib.urlencode(params))
+                context_options.append((self._common_addon.getLocalizedString(32039), cmd))
+                
                 display = account['name']
                 if 'type' in drive and drive['type']:
                     display += ' | ' + self.provider().drive_type_name(drive['type'])
                 if 'name' in drive and drive['name']:
                     display += ' | ' + drive['name']
                 list_item = xbmcgui.ListItem(display)
-                params = {'action':'open_drive', 'content_type': self._content_type, 'driveid': drive['id']}
-                url = self._addon_url + '?' + urllib.urlencode(params)
-                params = {'action':'remove_account', 'content_type': self._content_type, 'driveid': drive['id']}
-                context_options = [(self._common_addon.getLocalizedString(32006), 'RunPlugin('+self._addon_url + '?' + urllib.urlencode(params)+')')]
-                if size > 1:
-                    params['action'] = 'remove_drive'
-                    cmd =  'RunPlugin('+self._addon_url + '?' + urllib.urlencode(params)+')'
-                    context_options.append((self._common_addon.getLocalizedString(32007), cmd))
-                params['action'] = 'search'
-                params['c'] = time.time()
-                cmd = 'ActivateWindow(%d,%s?%s,return)' % (xbmcgui.getCurrentWindowId(), self._addon_url, urllib.urlencode(params))
-                context_options.append((self._common_addon.getLocalizedString(32039), cmd))
                 list_item.addContextMenuItems(context_options)
+                params = {'action':'_list_drive', 'content_type': self._content_type, 'driveid': drive['id']}
+                url = self._addon_url + '?' + urllib.urlencode(params)
                 listing.append((url, list_item, True))
         list_item = xbmcgui.ListItem(self._common_addon.getLocalizedString(32005))
-        params = {'action':'add_account', 'content_type': self._content_type}
+        params = {'action':'_add_account', 'content_type': self._content_type}
         url = self._addon_url + '?' + urllib.urlencode(params)
         listing.append((url, list_item))
         xbmcplugin.addDirectoryItems(self._addon_handle, listing, len(listing))
         xbmcplugin.endOfDirectory(self._addon_handle, True)
     
-    def add_account(self):
+    def _add_account(self):
         request_params = {
             'waiting_retry': lambda request, remaining: self._progress_dialog_bg.update(
                 int((request.current_delay - remaining)/request.current_delay*100),
@@ -153,7 +167,7 @@ class CloudDriveAddon(object):
         
         self._progress_dialog.update(60, self._common_addon.getLocalizedString(32064))
         try:
-            account = provider.account(request_params = request_params, access_tokens = tokens_info)
+            account = provider.retrieve_account(request_params = request_params, access_tokens = tokens_info)
         except Exception as e:
             raise UIException(32065, e)
         if self.cancel_operation():
@@ -161,7 +175,7 @@ class CloudDriveAddon(object):
         
         self._progress_dialog.update(90, self._common_addon.getLocalizedString(32017))
         try:
-            account['drives'] = provider.drives(request_params = request_params, access_tokens = tokens_info)
+            account['drives'] = provider.retrieve_drives(request_params = request_params, access_tokens = tokens_info)
         except Exception as e:
             raise UIException(32018, e)
         if self.cancel_operation():
@@ -179,7 +193,7 @@ class CloudDriveAddon(object):
         self._progress_dialog.close()
         xbmc.executebuiltin('Container.Refresh')
     
-    def remove_drive(self):
+    def _remove_drive(self):
         self._account_manager.load()
         driveid = self._addon_params.get('driveid', [None])[0]
         account = self._account_manager.account_by_driveid(driveid)
@@ -193,7 +207,7 @@ class CloudDriveAddon(object):
             self._account_manager.remove_drive(driveid)
         xbmc.executebuiltin('Container.Refresh')
     
-    def remove_account(self):
+    def _remove_account(self):
         self._account_manager.load()
         driveid = self._addon_params.get('driveid', [None])[0]
         account = self._account_manager.account_by_driveid(driveid)
@@ -201,41 +215,96 @@ class CloudDriveAddon(object):
             self._account_manager.remove_account(account['id'])
         xbmc.executebuiltin('Container.Refresh')
         
-    def open_drive(self):
+    def _list_drive(self):
+        drive_folders = self.custom_drive_folders()
+        if drive_folders:
+            listing = []
+            driveid = self._addon_params.get('driveid', [None])[0]
+            url = self._addon_url + '?' + urllib.urlencode({'action':'_list_folder', 'folder': 'root', 'content_type': self._content_type, 'driveid': driveid})
+            listing.append((url, xbmcgui.ListItem(self.my_files_menu_name()), True))
+            for folder in drive_folders:
+                params = {'action':'_list_folder', 'folder': folder['folder'], 'content_type': self._content_type, 'driveid': driveid}
+                if 'params' in folder:
+                    params.update(folder['params'])
+                url = self._addon_url + '?' + urllib.urlencode(params)
+                listing.append((url, xbmcgui.ListItem(folder['name']), True))
+                
+            xbmcplugin.addDirectoryItems(self._addon_handle, listing, len(listing))
+            xbmcplugin.endOfDirectory(self._addon_handle, True)
+        else:
+            self.list_folder()
+    '''
+    def _list_drive_folder(self):
         driveid = self._addon_params.get('driveid', [None])[0]
-        list_item = xbmcgui.ListItem(self._common_addon.getLocalizedString(32052))
-        params = {'action':'open_drive_folder', 'folder':'root', 'content_type': self._content_type, 'driveid': driveid}
-        url = self._addon_url + '?' + urllib.urlencode(params)
-        xbmcplugin.addDirectoryItem(self._addon_handle, url, list_item, True)
-        list_item = xbmcgui.ListItem(self._common_addon.getLocalizedString(32053))
-        params['action'] = 'open_simple_folder'
-        params['folder'] = 'recent'
-        url = self._addon_url + '?' + urllib.urlencode(params)
-        xbmcplugin.addDirectoryItem(self._addon_handle, url, list_item, True)
-        if self._content_type == 'image':
-            list_item = xbmcgui.ListItem(self._common_addon.getLocalizedString(32055))
-            params['action'] = 'open_drive_folder'
-            params['folder'] = 'special/photos'
-            url = self._addon_url + '?' + urllib.urlencode(params)
-            xbmcplugin.addDirectoryItem(self._addon_handle, url, list_item, True)
-        if self._content_type == 'audio':
-            list_item = xbmcgui.ListItem(self._common_addon.getLocalizedString(32056))
-            params['action'] = 'open_drive_folder'
-            params['folder'] = 'special/music'
-            url = self._addon_url + '?' + urllib.urlencode(params)
-            xbmcplugin.addDirectoryItem(self._addon_handle, url, list_item, True)
-        #list_item = xbmcgui.ListItem(addon.getLocalizedString(32057))
-        #params['action'] = 'open_simple_folder'
-        #params['folder'] = 'shared'
-        #url = base_url + '?' + urllib.urlencode(params)
-        #xbmcplugin.addDirectoryItem(addon_handle, url, list_item, True)
-        list_item = xbmcgui.ListItem(self._common_addon.getLocalizedString(32058))
-        params['action'] = 'open_shared_with_me'
-        params['folder'] = ''
-        url = self._addon_url + '?' + urllib.urlencode(params)
-        xbmcplugin.addDirectoryItem(self._addon_handle, url, list_item, True)
-        xbmcplugin.endOfDirectory(self._addon_handle)
+        self.provider().configure(self._account_manager, driveid)
+        items = self.drive_folder_items()
+        if self.cancel_operation():
+            return
+        self._process_items(items)
+    '''
+    def _list_folder(self):
+        driveid = self._addon_params.get('driveid', [None])[0]
+        self.provider().configure(self._account_manager, driveid)
+        items = self.folder_items()
+        if self.cancel_operation():
+            return
+        self._process_items(items)
+        
+    def _process_items(self, items):
+        listing = []
+        driveid = self._addon_params.get('driveid', [None])[0]
+        for item in items:
+            item_id = item['id']
+            item_name = item['name']
+            item_name_extension = item['name_extension']
+            item_drive_id = Utils.default(Utils.get_safe_value(item, 'drive_id'), driveid)
+            list_item = xbmcgui.ListItem(item_name)
+            url = None
+            is_folder = 'folder' in item
+            params = {'content_type': self._content_type, 'item_driveid': item_drive_id, 'item_id': item_id, 'driveid': driveid}
+            if is_folder:
+                params['action'] = '_list_folder'
+                url = self._addon_url + '?' + urllib.urlencode(params)
+                context_options = []
+                if self._content_type == 'audio' or self._content_type == 'video':
+                    params['action'] = '_export_folder'
+                    context_options.append((self._common_addon.getLocalizedString(32004), 'RunPlugin('+self._addon_url + '?' + urllib.urlencode(params)+')'))
+                elif self._content_type == 'image':
+                    params['action'] = '_slideshow'
+                    context_options.append((self._common_addon.getLocalizedString(32032), 'RunPlugin('+self._addon_url + '?' + urllib.urlencode(params)+')'))
+                params['action'] = '_search'
+                params['c'] = time.time()
+                cmd = 'ActivateWindow(%d,%s?%s,return)' % (xbmcgui.getCurrentWindowId(), self._addon_url, urllib.urlencode(params))
+                context_options.append((self._common_addon.getLocalizedString(32039), cmd))
+            elif (('video' in item or item_name_extension in self._video_file_extensions) and self._content_type == 'video') or (('audio' in item or item_name_extension in self._audio_file_extensions) and self._content_type == 'audio'):
+                list_item.setProperty('IsPlayable', 'true')
+                params['action'] = 'play'
+                url = self._addon_url + '?' + urllib.urlencode(params)
+                if 'audio' in item:
+                    list_item.setInfo('music', item['audio'])
+                elif 'video' in item:
+                    list_item.addStreamInfo('video', item['video'])
+                if 'thumbnail' in item:
+                    list_item.setIconImage(item['thumbnail'])
+                    list_item.setThumbnailImage(item['thumbnail'])
+            elif 'image' in item and self._content_type == 'image' and item_name_extension != 'mp4':
+                params['action'] = 'play'
+                url = self._addon_url + '?' + urllib.urlencode(params)
+                list_item.setInfo('pictures', item['image'])
+                list_item.setProperty('mimetype', Utils.get_safe_value(item, 'mimetype'))
+                if 'thumbnail' in item:
+                    list_item.setIconImage(item['thumbnail'])
+            if url:
+                listing.append((url, list_item, is_folder))
+        xbmcplugin.addDirectoryItems(self._addon_handle, listing, len(listing))
+        xbmcplugin.endOfDirectory(self._addon_handle, True)
     
+    def play(self):
+        driveid = self._addon_params.get('driveid', [None])[0]
+        self.provider().configure(self._account_manager, driveid)
+        item_id = self._addon_params.get('item_id', [None])[0]
+        item_driveid = self._addon_params.get('item_driveid', [driveid])[0]
+        
     '''
     def open_drive_folder(self):
         driveid = self._addon_params.get('driveid', [None])[0]
