@@ -4,11 +4,12 @@
 	<requires>
 		<import addon="xbmc.python" version="2.19.0" />
 	</requires>
-	<extension point="xbmc.python.module" library="lib" />
+	<extension point="xbmc.python.module" library="/" />
+	<extension point="xbmc.service" library="service.py" start="login" />
 	<extension point="xbmc.addon.metadata">
 		<platform>all</platform>
-		<summary lang="en">Cloud drive common classes</summary>
-		<description lang="en">Common classes for all the cloud drive addons.
+		<summary lang="en">Cloud Drive Common Module</summary>
+		<description lang="en">Common Services and Classes for all the cloud drive addons.
 		</description>
 		<license>GNU GENERAL PUBLIC LICENSE. Version 2, June 1991</license>
 		<source>https://github.com/cguZZman/clouddrive-common-kodi-addon</source>

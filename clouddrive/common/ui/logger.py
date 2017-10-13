@@ -20,19 +20,15 @@
     @author: Carlos Guzman (cguZZman) carlosguzmang@hotmail.com
 '''
 
-import urllib
-
-from clouddrive.common.remote.request import Request
-import base64
+from clouddrive.common.utils import Utils
+import xbmc
 
 
-class Signin(object):
-    _signin_url = 'http://localhost:8888'
+class Logger:
+    @staticmethod
+    def debug(msg):
+        xbmc.log(Utils.str(msg), xbmc.LOGDEBUG)
     
-    def create_pin(self, provider_name, request_params={}):
-        body = urllib.urlencode({'provider': provider_name})
-        return Request(self._signin_url + '/pin', body, None, **request_params).request_json()
-    
-    def retrieve_tokens_info(self, pin_info, request_params={}):
-        headers = {'authorization': 'Basic ' + base64.b64encode(':' + pin_info['password'])}
-        return Request(self._signin_url + '/pin/' + pin_info['pin'], None, headers, **request_params).request_json()
+    @staticmethod
+    def notice(msg):
+        xbmc.log(Utils.str(msg), xbmc.LOGNOTICE)

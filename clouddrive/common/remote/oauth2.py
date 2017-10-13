@@ -59,7 +59,7 @@ class OAuth2(object):
         request_params['on_exception'] = lambda request, e: self._on_exception(request, e, original_on_exception)
     
     def _validate_access_tokens(self, access_tokens, url, data, request_headers):
-        if not 'access_token' in access_tokens or not 'refresh_token' in access_tokens or not 'expires_in' in access_tokens or not 'date' in access_tokens:
+        if not access_tokens or not 'access_token' in access_tokens or not 'refresh_token' in access_tokens or not 'expires_in' in access_tokens or not 'date' in access_tokens:
             raise RequestException('Access tokens provided are not valid: ' + Utils.str(access_tokens), None, 'Request URL: '+Utils.str(url)+'\nRequest data: '+Utils.str(data)+'\nRequest headers: '+Utils.str(request_headers), None)
     
     def _build_url(self, method, path, parameters):
