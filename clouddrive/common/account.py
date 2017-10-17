@@ -52,14 +52,14 @@ class AccountManager(object):
         self.accounts[account['id']] = account
         self.save()
     
-    def account_by_driveid(self, driveid):
+    def get_account_by_driveid(self, driveid):
         for accountid in self.accounts:
             for drive in self.accounts[accountid]['drives']:
                 if drive['id'] == driveid:
                     return self.accounts[accountid]
         raise AccountNotFoundException()
     
-    def drive_by_driveid(self, driveid):
+    def get_drive_by_driveid(self, driveid):
         for account_id in self.accounts:
             for drive in self.accounts[account_id]['drives']:
                 if drive['id'] == driveid:
@@ -77,8 +77,8 @@ class AccountManager(object):
     
     def remove_drive(self, driveid):
         self.load()
-        account = self.account_by_driveid(driveid)
-        drive = self.drive_by_driveid(driveid)
+        account = self.get_account_by_driveid(driveid)
+        drive = self.get_drive_by_driveid(driveid)
         account['drives'].remove(drive)
         self.save()
 

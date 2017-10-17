@@ -29,6 +29,13 @@ class Utils:
         return ''
     
     @staticmethod
+    def remove_extension(name):
+        index = name.rfind('.')
+        if index > -1:
+            return name[:index]
+        return name
+    
+    @staticmethod
     def replace_extension(name, newExtension):
         index = name.rfind('.')
         if index > -1:
@@ -58,4 +65,16 @@ class Utils:
     @staticmethod
     def ascii(txt):
         return Utils.unicode(txt).encode('ascii', 'ignore')
+   
+    @staticmethod
+    def get_fqn(o):
+        return o.__module__ + "." + o.__class__.__name__
+    
+    @staticmethod
+    def get_class(fqn):
+        data = fqn.split('.')
+        module = __import__(data[0])
+        for comp in data[1:]:
+            module = getattr(module, comp)
+        return module
     

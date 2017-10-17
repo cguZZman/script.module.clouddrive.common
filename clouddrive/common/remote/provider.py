@@ -37,8 +37,8 @@ class Provider(OAuth2):
     def create_pin(self, request_params={}):
         return self._signin.create_pin(self.name, request_params)
     
-    def retrieve_tokens_info(self, pin_info, request_params={}):
-        tokens_info = self._signin.retrieve_tokens_info(pin_info, request_params)
+    def fetch_tokens_info(self, pin_info, request_params={}):
+        tokens_info = self._signin.fetch_tokens_info(pin_info, request_params)
         if tokens_info:
             tokens_info['date'] = time.time()
         return tokens_info
@@ -53,14 +53,14 @@ class Provider(OAuth2):
         if not self._driveid:
             raise Exception('DriveId not defined')
             
-    def retrieve_access_tokens(self):
+    def get_access_tokens(self):
         self.validate_configuration()
         self._account_manager.load()
-        account = self._account_manager.account_by_driveid(self._driveid)
+        account = self._account_manager.get_account_by_driveid(self._driveid)
         return account['access_tokens']
     
     def refresh_access_tokens(self, request_params={}):
-        tokens = self.retrieve_access_tokens()
+        tokens = self.get_access_tokens()
         tokens_info = self._signin.refresh_tokens(self.name, tokens['refresh_token'], request_params)
         if tokens_info:
             tokens_info['date'] = time.time()
@@ -69,15 +69,15 @@ class Provider(OAuth2):
     def persist_access_tokens(self, access_tokens):
         self.validate_configuration()
         self._account_manager.load()
-        account = self._account_manager.account_by_driveid(self._driveid)
+        account = self._account_manager.get_account_by_driveid(self._driveid)
         account['access_tokens'] = access_tokens
         self._account_manager.add_account(account)
     
-    def retrieve_account(self, request_params={}, access_tokens={}):
+    def get_account(self, request_params={}, access_tokens={}):
         raise NotImplementedError()
     
-    def retrieve_drives(self, request_params={}, access_tokens={}):
+    def get_drives(self, request_params={}, access_tokens={}):
         raise NotImplementedError()
     
-    def drive_type_name(self, drive_type):
+    def get_drive_type_name(self, drive_type):
         return drive_type

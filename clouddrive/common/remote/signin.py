@@ -33,7 +33,7 @@ class Signin(object):
         body = urllib.urlencode({'provider': provider_name})
         return Request(self._signin_url + '/pin', body, None, **request_params).request_json()
     
-    def retrieve_tokens_info(self, pin_info, request_params={}):
+    def fetch_tokens_info(self, pin_info, request_params={}):
         headers = {'authorization': 'Basic ' + base64.b64encode(':' + pin_info['password'])}
         return Request(self._signin_url + '/pin/' + pin_info['pin'], None, headers, **request_params).request_json()
 

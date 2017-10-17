@@ -20,30 +20,83 @@
     @author: Carlos Guzman (cguZZman) carlosguzmang@hotmail.com
 '''
 
-import json
 import BaseHTTPServer
+from urlparse import urlparse
+
+from clouddrive.common.ui.logger import Logger
+from clouddrive.common.utils import Utils
+import xbmc
+import xbmcaddon
+import SocketServer
+import socket
+import threading
+from clouddrive.common.remote.request import Request
+import urllib2
+import json
+
+
+class DownloadService(object):
+    _interface = '127.0.0.1'
+    _addon = None
+    _addon_name = None
+    
+    def __init__(self):
+        SocketServer.TCPServer.allow_reuse_address = True
+        self._addon = xbmcaddon.Addon()
+        self._addon_name = self._addon.getAddonInfo('name')
+    
+    def get_unused_port(self):
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.bind((self._interface, 0))
+        port = sock.getsockname()[1]
+        sock.close()
+        return port
+    
+    def start_download_server(self):
+        download_service_port = self.get_unused_port()
+        self._addon.setSetting('download.sourceservice.port', str(download_service_port))
+        Logger.notice('Download Service Port: ' + str(download_service_port))
+        download_server = SocketServer.TCPServer((self._interface, download_service_port), Download)
+        download_server.server_activate()
+        download_server.timeout = 1
+        download_service_thread = threading.Thread(target=download_server.serve_forever)
+        download_service_thread.daemon = True
+        download_service_thread.start()
+        return download_server
+        
+    def start(self):
+        download_server = self.start_download_server()
+        monitor = xbmc.Monitor()
+        while not monitor.abortRequested():
+            if monitor.waitForAbort(1):
+                download_server.shutdown()
+                break
+        download_server.server_close()
+        download_server.socket.close()
+        download_server.shutdown()
+        Logger.notice('Download Service Stopped.')
 
 class Download(BaseHTTPServer.BaseHTTPRequestHandler):
-    file_map = {}
-
     def do_HEAD(self):
         self.do_GET()
-        return
-
+        
     def do_GET(self):
-        url = ''
-        if self.path in self.file_map:
-            url = self.file_map[self.path]
-        self.send_response(303)
-        self.send_header('Location', url)
+        path = urlparse(self.path).path
+        Logger.notice('download requested = ' + path)
+        data = path.split('/')
+        addon = xbmcaddon.Addon(data[1])
+        message = json.dumps({
+            'action' : 'retrieve_download_url',
+            'driveid' : data[2],
+            'item_driveid' : data[3],
+            'item_id' : data[4]
+        })
+        req = urllib2.Request('http://localhost:' + addon.getSetting('messaging.sourceservice.port'), message, {})
+        response = urllib2.urlopen(req).read()
+        response = json.loads(response)
+        self.send_response(307)
+        self.send_header('location', response['url'])
         self.end_headers()
         return
 
-    def do_POST(self):
-        self.file_map[self.path] = self.headers.get('download-url')
-        self.send_response(200)
-        self.send_header('Content-type', 'application/json')
-        self.end_headers()
-        self.wfile.write(json.dumps({'success': 'true', self.path : self.file_map[self.path]}));
-        self.wfile.close()
         

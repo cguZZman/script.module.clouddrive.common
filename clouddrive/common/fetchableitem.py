@@ -20,23 +20,6 @@
     @author: Carlos Guzman (cguZZman) carlosguzmang@hotmail.com
 '''
 
-from clouddrive.common.utils import Utils
-import xbmc
-import xbmcaddon
-
-class Logger:
-    @staticmethod
-    def _log(msg, level):
-        xbmc.log('[' + xbmcaddon.Addon().getAddonInfo('id') + '] - ' + Utils.str(msg), level)
-        
-    @staticmethod
-    def debug(msg):
-        Logger._log(msg, xbmc.LOGNOTICE)
-    
-    @staticmethod
-    def notice(msg):
-        Logger._log(msg, xbmc.LOGNOTICE)
-    
-    @staticmethod
-    def error(msg):
-        Logger._log(msg, xbmc.LOGERROR)
+class FetchableItem(object):
+    def get_item(self, driveid, item_driveid, item_id, find_subtitles=False, include_download_info=False):
+        raise NotImplementedError()

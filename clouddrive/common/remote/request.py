@@ -145,5 +145,5 @@ class Request(object):
     def request_json(self):
         return json.loads(Utils.default(self.request(), self._DEFAULT_RESPONSE))
 
-    def response_text_as_json(self):
+    def get_response_text_as_json(self):
         return json.loads(Utils.default(self.response_text, self._DEFAULT_RESPONSE))

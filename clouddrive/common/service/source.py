@@ -30,7 +30,46 @@ from clouddrive.common.utils import Utils
 import xbmc
 import xbmcaddon
 import xbmcgui
+import SocketServer
+import socket
+from clouddrive.common.ui.logger import Logger
 
+
+class SourceService(object):
+    _interface = '127.0.0.1'
+    _addon = None
+    _addon_name = None
+    
+    def __init__(self):
+        SocketServer.TCPServer.allow_reuse_address = True
+        self._addon = xbmcaddon.Addon()
+        self._addon_name = self._addon.getAddonInfo('name')
+    
+    def start_source_server(self):
+        if self._addon.getSetting('allow_directory_listing') == 'true':
+            source_service_port = int(self._addon.getSetting('port_directory_listing'))
+            source_server = SocketServer.TCPServer((self._interface, source_service_port), Source)
+            source_server.server_activate()
+            source_server.timeout = 1
+            source_service_thread = threading.Thread(target=source_server.serve_forever)
+            source_service_thread.daemon = True
+            source_service_thread.start()
+            Logger.notice(self._addon_name + ' - Source Service Port: ' + str(source_service_port))
+            return source_server
+        
+    def start(self):
+        source_server = self.start_source_server()
+        monitor = xbmc.Monitor()
+        while not monitor.abortRequested():
+            if monitor.waitForAbort(1):
+                if source_server:
+                    source_server.shutdown()
+                break
+        if source_server:
+            source_server.server_close()
+            source_server.socket.close()
+            source_server.shutdown()
+        Logger.notice(self._addon_name + ' Source Service Stopped.')
 
 class Source(BaseHTTPServer.BaseHTTPRequestHandler):
 
@@ -67,7 +106,7 @@ class Source(BaseHTTPServer.BaseHTTPRequestHandler):
     def show_no_account(self):
         xbmcgui.Dialog().ok(self.addonname, self.addon.getLocalizedString(32070), self.addon.getLocalizedString(32071))
     
-    def accounts(self):
+    def get_accounts(self):
         self.send_response(200)
         self.send_header('Content-type', self.content_type)
         self.end_headers()
@@ -178,6 +217,6 @@ class Source(BaseHTTPServer.BaseHTTPRequestHandler):
                 else:
                     self.list_dir(onedrive, drive_path)
         else:
-            self.accounts();
+            self.get_accounts();
             
             

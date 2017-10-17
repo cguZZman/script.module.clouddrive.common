@@ -32,13 +32,13 @@ from clouddrive.common.utils import Utils
 
 class OAuth2(object):
     
-    def _api_url(self):
+    def _get_api_url(self):
         raise NotImplementedError()
 
-    def _request_headers(self):
+    def _get_request_headers(self):
         raise NotImplementedError()
     
-    def retrieve_access_tokens(self):
+    def get_access_tokens(self):
         raise NotImplementedError()
     
     def refresh_access_tokens(self, request_params={}):
@@ -63,7 +63,7 @@ class OAuth2(object):
             raise RequestException('Access tokens provided are not valid: ' + Utils.str(access_tokens), None, 'Request URL: '+Utils.str(url)+'\nRequest data: '+Utils.str(data)+'\nRequest headers: '+Utils.str(request_headers), None)
     
     def _build_url(self, method, path, parameters):
-        url = self._api_url()
+        url = self._get_api_url()
         if re.search("^https?://", path):
             url = path
         else:
@@ -79,9 +79,9 @@ class OAuth2(object):
         url = self._build_url(method, path, encoded_parameters)
         self._wrap_on_exception(request_params)
         data = None if method == 'get' else encoded_parameters
-        request_headers = Utils.default(self._request_headers(), {})
+        request_headers = Utils.default(self._get_request_headers(), {})
         if not access_tokens:
-            access_tokens = self.retrieve_access_tokens()
+            access_tokens = self.get_access_tokens()
         self._validate_access_tokens(access_tokens, url, data, request_headers)
         if time.time() > (access_tokens['date'] + access_tokens['expires_in']):
             access_tokens = self.refresh_access_tokens(request_params)

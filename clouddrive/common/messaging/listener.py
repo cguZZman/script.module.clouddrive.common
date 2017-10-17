@@ -20,23 +20,20 @@
     @author: Carlos Guzman (cguZZman) carlosguzmang@hotmail.com
 '''
 
-from clouddrive.common.utils import Utils
-import xbmc
-import xbmcaddon
+import json
 
-class Logger:
-    @staticmethod
-    def _log(msg, level):
-        xbmc.log('[' + xbmcaddon.Addon().getAddonInfo('id') + '] - ' + Utils.str(msg), level)
-        
-    @staticmethod
-    def debug(msg):
-        Logger._log(msg, xbmc.LOGNOTICE)
-    
-    @staticmethod
-    def notice(msg):
-        Logger._log(msg, xbmc.LOGNOTICE)
-    
-    @staticmethod
-    def error(msg):
-        Logger._log(msg, xbmc.LOGERROR)
+from clouddrive.common.fetchableitem import FetchableItem
+from clouddrive.common.service.messaging import MessagingListerner
+
+class CloudDriveMessagingListerner(MessagingListerner, FetchableItem):
+    def on_message(self, message, handler):
+        if message:
+            msg = json.loads(message)
+            if msg['action'] == 'retrieve_download_url':
+                driveid = msg['driveid']
+                item_driveid = msg['item_driveid']
+                item_id = msg['item_id']
+                item = self.get_item(driveid, item_driveid, item_id, include_download_info=True)
+                info = item['download_info']
+                return info
+        return ''

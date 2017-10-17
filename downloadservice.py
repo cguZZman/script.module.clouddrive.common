@@ -19,9 +19,9 @@
     Created on Mar 1, 2015
     @author: Carlos Guzman (cguZZman) carlosguzmang@hotmail.com
 '''
-from clouddrive.common.service.clouddriveservice import CloudDriveService
+from clouddrive.common.service.download import DownloadService
 
 
 if __name__ == '__main__':
-    CloudDriveService().main()
+    DownloadService().start()
     
