@@ -97,7 +97,7 @@ class Request(object):
             request_report = 'Request URL: ' + Utils.str(self.url)
             request_report += '\nRequest data: ' + Utils.str(self.data)
             request_report += '\nRequest headers: ' + Utils.str(self.headers)
-            Logger.debug(request_report);
+            #Logger.debug(request_report);
             try:
                 req = urllib2.Request(self.url, self.data, self.headers)
                 response = urllib2.urlopen(req)
@@ -139,7 +139,7 @@ class Request(object):
             self.on_success(self)
         if self.on_complete:
             self.on_complete(self)
-        Logger.debug('Response text: ' + Utils.str(self.response_text))
+        #Logger.debug('Response text: ' + Utils.str(self.response_text))
         return self.response_text
         
     def request_json(self):

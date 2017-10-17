@@ -16,24 +16,9 @@ msgstr ""
 "Language: en\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 
-msgctxt "#32000"
-msgid "Account"
-msgstr ""
-
-msgctxt "#32001"
-msgid "Video Library Export Folder"
-msgstr ""
-
-msgctxt "#32002"
-msgid "Music Library Export Folder"
-msgstr ""
-
-msgctxt "#32003"
-msgid "Before export to library, remove previous files and folders"
-msgstr ""
 
 msgctxt "#32004"
-msgid "Add to library (export .strm)..."
+msgid "Export to library (.strm)..."
 msgstr ""
 
 msgctxt "#32005"
@@ -144,14 +129,6 @@ msgctxt "#32031"
 msgid "Report errors automatically to help resolve them quickly"
 msgstr ""
 
-msgctxt "#32032"
-msgid "Auto-Refreshed slideshow"
-msgstr ""
-
-msgctxt "#32033"
-msgid "Refresh interval in minutes"
-msgstr ""
-
 msgctxt "#32034"
 msgid "'%s' is not a folder"
 msgstr ""
@@ -173,7 +150,7 @@ msgid "Please try again later."
 msgstr ""
 
 msgctxt "#32039"
-msgid "Search in %s..."
+msgid "Search..."
 msgstr ""
 
 msgctxt "#32040"
@@ -218,10 +195,6 @@ msgstr ""
 
 msgctxt "#32050"
 msgid "Loading %s items from search, please wait..."
-msgstr ""
-
-msgctxt "#32051"
-msgid "When playing videos, set the subtitle file located next to the video (.srt)"
 msgstr ""
 
 msgctxt "#32052"

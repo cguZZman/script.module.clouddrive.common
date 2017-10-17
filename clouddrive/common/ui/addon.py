@@ -36,6 +36,8 @@ import xbmc
 import xbmcaddon
 import xbmcgui
 import xbmcplugin
+import xbmcvfs
+import os
 
 
 class CloudDriveAddon(FetchableItem):
@@ -52,13 +54,19 @@ class CloudDriveAddon(FetchableItem):
     _cancel_operation = False
     _content_type = None
     _dialog = None
+    _exporting = False
+    _exporting_target = 0
+    _exporting_percent = 0
+    _exporting_count = 0
     _profile_path = None
     _progress_dialog = None
     _progress_dialog_bg = None
+    _export_progress_dialog_bg = None
     _system_monitor = None
     _video_file_extensions = ['mkv', 'mp4', 'avi', 'iso', 'nut', 'ogg', 'vivo', 'pva', 'nuv', 'nsv', 'nsa', 'fli', 'flc', 'wtv', 'flv']
     _audio_file_extensions = ['mp3', 'wav', 'flac', 'alac', 'aiff', 'amr', 'ape', 'shn', 's3m', 'nsf', 'spc']
     _account_manager = None
+    _home_window = None
     
     def __init__(self):
         self._addon = xbmcaddon.Addon()
@@ -70,22 +78,25 @@ class CloudDriveAddon(FetchableItem):
         self._profile_path = Utils.unicode(xbmc.translatePath(self._addon.getAddonInfo('profile')))
         self._progress_dialog = DialogProgress(self._addon_name)
         self._progress_dialog_bg = DialogProgressBG(self._addon_name)
+        self._export_progress_dialog_bg = DialogProgressBG(self._addon_name)
         self._system_monitor = xbmc.Monitor()
         self._account_manager = AccountManager(self._profile_path)
+        self._home_window = xbmcgui.Window(10000)
         
         if len(sys.argv) > 1:
             self._addon_handle = int(sys.argv[1])
             self._addon_params = urlparse.parse_qs(sys.argv[2][1:])
-        try:
-            self._content_type = self._addon_params.get('content_type')[0]
-        except:
-            wid = xbmcgui.getCurrentWindowId()
-            if wid == 10005 or wid == 10500 or wid == 10501 or wid == 10502:
-                self._content_type = 'audio'
-            elif wid == 10002:
-                self._content_type = 'image'
-            else:
-                self._content_type = 'video'
+            for param in self._addon_params:
+                self._addon_params[param] = self._addon_params.get(param)[0]
+            self._content_type = Utils.get_safe_value(self._addon_params, 'content_type')
+            if not self._content_type:
+                wid = xbmcgui.getCurrentWindowId()
+                if wid == 10005 or wid == 10500 or wid == 10501 or wid == 10502:
+                    self._content_type = 'audio'
+                elif wid == 10002:
+                    self._content_type = 'image'
+                else:
+                    self._content_type = 'video'
     
     def get_provider(self):
         raise NotImplementedError()
@@ -96,7 +107,10 @@ class CloudDriveAddon(FetchableItem):
     def get_custom_drive_folders(self):
         return [{'name' : self._common_addon.getLocalizedString(32058), 'folder' : 'shared_with_me'}]
     
-    def get_folder_items(self):
+    def get_folder_items(self, driveid=None, item_driveid=None, item_id=None, folder=None):
+        raise NotImplementedError()
+    
+    def search(self, query, driveid=None, item_driveid=None, item_id=None):
         raise NotImplementedError()
     
     def cancel_operation(self):
@@ -109,17 +123,16 @@ class CloudDriveAddon(FetchableItem):
             account = accounts[account_id]
             size = len(account['drives'])
             for drive in account['drives']:
-                params = {'action':'_remove_account', 'content_type': self._content_type, 'driveid': drive['id']}
-                context_options = [(self._common_addon.getLocalizedString(32006), 'RunPlugin('+self._addon_url + '?' + urllib.urlencode(params)+')')]
+                context_options = []
+                params = {'action':'_search', 'content_type': self._content_type, 'driveid': drive['id']}
+                cmd = 'ActivateWindow(%d,%s?%s)' % (xbmcgui.getCurrentWindowId(), self._addon_url, urllib.urlencode(params))
+                context_options.append((self._common_addon.getLocalizedString(32039), cmd))
+                params['action'] = '_remove_account'
+                context_options.append((self._common_addon.getLocalizedString(32006), 'RunPlugin('+self._addon_url + '?' + urllib.urlencode(params)+')'))
                 if size > 1:
                     params['action'] = '_remove_drive'
                     cmd =  'RunPlugin('+self._addon_url + '?' + urllib.urlencode(params)+')'
                     context_options.append((self._common_addon.getLocalizedString(32007), cmd))
-                params['action'] = '_search'
-                params['c'] = time.time()
-                cmd = 'ActivateWindow(%d,%s?%s,return)' % (xbmcgui.getCurrentWindowId(), self._addon_url, urllib.urlencode(params))
-                context_options.append((self._common_addon.getLocalizedString(32039), cmd))
-                
                 display = account['name']
                 if 'type' in drive and drive['type']:
                     display += ' | ' + self.get_provider().get_drive_type_name(drive['type'])
@@ -206,9 +219,8 @@ class CloudDriveAddon(FetchableItem):
         self._progress_dialog.close()
         xbmc.executebuiltin('Container.Refresh')
     
-    def _remove_drive(self):
+    def _remove_drive(self, driveid=None, **kwargs):
         self._account_manager.load()
-        driveid = self._addon_params.get('driveid', [None])[0]
         account = self._account_manager.get_account_by_driveid(driveid)
         drive = self._account_manager.get_drive_by_driveid(driveid)
         display = account['name']
@@ -220,19 +232,19 @@ class CloudDriveAddon(FetchableItem):
             self._account_manager.remove_drive(driveid)
         xbmc.executebuiltin('Container.Refresh')
     
-    def _remove_account(self):
+    def _remove_account(self, driveid=None, **kwargs):
         self._account_manager.load()
-        driveid = self._addon_params.get('driveid', [None])[0]
         account = self._account_manager.get_account_by_driveid(driveid)
         if self._dialog.yesno(self._addon_name, self._common_addon.getLocalizedString(32022) % account['name'], None):
             self._account_manager.remove_account(account['id'])
         xbmc.executebuiltin('Container.Refresh')
         
-    def _list_drive(self):
+    def _list_drive(self, driveid=None, **kwargs):
         drive_folders = self.get_custom_drive_folders()
+        if self.cancel_operation():
+            return
         if drive_folders:
             listing = []
-            driveid = self._addon_params.get('driveid', [None])[0]
             url = self._addon_url + '?' + urllib.urlencode({'action':'_list_folder', 'folder': 'root', 'content_type': self._content_type, 'driveid': driveid})
             listing.append((url, xbmcgui.ListItem(self.get_my_files_menu_name()), True))
             for folder in drive_folders:
@@ -247,17 +259,15 @@ class CloudDriveAddon(FetchableItem):
         else:
             self.list_folder()
 
-    def _list_folder(self):
-        driveid = self._addon_params.get('driveid', [None])[0]
+    def _list_folder(self, driveid=None, item_driveid=None, item_id=None, folder=None, **kwargs):
         self.get_provider().configure(self._account_manager, driveid)
-        items = self.get_folder_items()
+        items = self.get_folder_items(driveid, item_driveid, item_id, folder)
         if self.cancel_operation():
             return
-        self._process_items(items)
+        self._process_items(items, driveid)
         
-    def _process_items(self, items):
+    def _process_items(self, items, driveid=None):
         listing = []
-        driveid = self._addon_params.get('driveid', [None])[0]
         for item in items:
             item_id = item['id']
             item_name = item['name']
@@ -271,16 +281,16 @@ class CloudDriveAddon(FetchableItem):
                 params['action'] = '_list_folder'
                 url = self._addon_url + '?' + urllib.urlencode(params)
                 context_options = []
+                params['action'] = '_search'
+                cmd = 'ActivateWindow(%d,%s?%s)' % (xbmcgui.getCurrentWindowId(), self._addon_url, urllib.urlencode(params))
+                context_options.append((self._common_addon.getLocalizedString(32039), cmd))
                 if self._content_type == 'audio' or self._content_type == 'video':
                     params['action'] = '_export_folder'
                     context_options.append((self._common_addon.getLocalizedString(32004), 'RunPlugin('+self._addon_url + '?' + urllib.urlencode(params)+')'))
                 elif self._content_type == 'image':
                     params['action'] = '_slideshow'
                     context_options.append((self._common_addon.getLocalizedString(32032), 'RunPlugin('+self._addon_url + '?' + urllib.urlencode(params)+')'))
-                params['action'] = '_search'
-                params['c'] = time.time()
-                cmd = 'ActivateWindow(%d,%s?%s,return)' % (xbmcgui.getCurrentWindowId(), self._addon_url, urllib.urlencode(params))
-                context_options.append((self._common_addon.getLocalizedString(32039), cmd))
+                list_item.addContextMenuItems(context_options)
             elif (('video' in item or item_name_extension in self._video_file_extensions) and self._content_type == 'video') or (('audio' in item or item_name_extension in self._audio_file_extensions) and self._content_type == 'audio'):
                 list_item.setProperty('IsPlayable', 'true')
                 params['action'] = 'play'
@@ -304,11 +314,87 @@ class CloudDriveAddon(FetchableItem):
         xbmcplugin.addDirectoryItems(self._addon_handle, listing, len(listing))
         xbmcplugin.endOfDirectory(self._addon_handle, True)
     
-    def play(self):
-        driveid = self._addon_params.get('driveid', [None])[0]
-        item_id = self._addon_params.get('item_id', [None])[0]
-        item_driveid = self._addon_params.get('item_driveid', [driveid])[0]
-        find_subtitles = self._common_addon.getSetting('set_subtitle') == 'true' and self._content_type == 'video'
+    def _search(self, driveid=None, item_driveid=None, item_id=None, **kwargs):
+        query = self._dialog.input(self._addon_name + ' - ' + self._common_addon.getLocalizedString(32042))
+        Logger.notice('query = ' + query)
+        if query:
+            Logger.notice('searching... [%d]' % self._addon_handle)
+            items = self.search(query, driveid, item_driveid, item_id)
+            Logger.notice('result size = %d ' % len(items))
+            if self.cancel_operation():
+                return
+            self._process_items(items, driveid)
+        
+    def _export_folder(self, driveid=None, item_driveid=None, item_id=None, **kwargs):
+        if self._home_window.getProperty(self._addon_id + 'exporting'):
+            self._dialog.ok(self._addon_name, self._common_addon.getLocalizedString(32059) + ' ' + self._common_addon.getLocalizedString(32038))
+        else:
+            string_id = 32002 if self._content_type == 'audio' else 32001
+            string_config = 'music_library_folder' if self._content_type == 'audio' else 'video_library_folder'
+            export_folder = self._addon.getSetting(string_config)
+            if not export_folder or not xbmcvfs.exists(export_folder):
+                export_folder = self._dialog.browse(0, self._common_addon.getLocalizedString(string_id), 'files', '', False, False, '')
+            if xbmcvfs.exists(export_folder):
+                self._export_progress_dialog_bg.create(self._addon_name + ' ' + self._common_addon.getLocalizedString(32024), self._common_addon.getLocalizedString(32025))
+                self._export_progress_dialog_bg.update(0)
+                self._addon.setSetting(string_config, export_folder)
+                item = self.get_item(driveid, item_driveid, item_id)
+                if self.cancel_operation():
+                    return
+                self._exporting_target = int(item['folder']['child_count']) + 1
+                folder_name = Utils.unicode(item['name']).encode('ascii', 'ignore')
+                folder_path = export_folder + folder_name + '/'
+                if self._addon.getSetting('clean_folder') != 'true' or not xbmcvfs.exists(folder_path) or xbmcvfs.rmdir(folder_path, True):
+                    self._exporting = True
+                    self._home_window.setProperty(self._addon_id + 'exporting', 'true')
+                    self.__export_folder(driveid, item, export_folder)
+                else:
+                    self._dialog.ok(self._addon_name, self._common_addon.getLocalizedString(32066) % folder_path)
+                self._export_progress_dialog_bg.close()
+            else:
+                self._dialog.ok(self._addon_name, export_folder + ' ' + self._common_addon.getLocalizedString(32026))
+    
+    def __export_folder(self, driveid, folder, export_folder):
+        folder_name = Utils.unicode(folder['name']).encode('ascii', 'ignore')
+        folder_path = os.path.join(os.path.join(export_folder, folder_name), '')
+        if not xbmcvfs.exists(folder_path):
+            try:
+                xbmcvfs.mkdirs(folder_path)
+            except:
+                self._system_monitor.waitForAbort(3)
+                xbmcvfs.mkdirs(folder_path)
+        items = self.get_folder_items(driveid, Utils.default(Utils.get_safe_value(folder, 'drive_id'), driveid), folder['id'])
+        if self.cancel_operation():
+            return
+        for item in items:
+            if 'folder' in item:
+                self._exporting_target += int(item['folder']['child_count'])
+        string_config = 'music_library_folder' if self._content_type == 'audio' else 'video_library_folder'
+        base_export_folder = self._addon.getSetting(string_config)
+        for item in items:
+            is_folder = 'folder' in item
+            item_name = Utils.ascii(item['name'])
+            item_name_extension = item['name_extension']
+            file_path = os.path.join(folder_path, item_name)
+            if is_folder:
+                self.__export_folder(driveid, item, folder_path)
+            elif (('video' in item or item_name_extension in self._video_file_extensions) and self._content_type == 'video') or ('audio' in item and self._content_type == 'audio'):
+                item_id = Utils.ascii(item['id'])
+                item_drive_id = Utils.default(Utils.get_safe_value(item, 'drive_id'), driveid)
+                params = {'action':'play', 'content_type': self._content_type, 'item_driveid': item_drive_id, 'item_id': item_id, 'driveid': driveid}
+                url = self._addon_url + '?' + urllib.urlencode(params)
+                file_path += '.strm'
+                f = xbmcvfs.File(file_path, 'w')
+                f.write(url)
+                f.close()
+            self._exporting_count += 1
+            p = int(self._exporting_count/float(self._exporting_target)*100)
+            if self._exporting_percent < p:
+                self._exporting_percent = p
+            self._export_progress_dialog_bg.update(self._exporting_percent, self._addon_name + ' ' + self._common_addon.getLocalizedString(32024), file_path[len(base_export_folder):])        
+    
+    def play(self, driveid=None, item_driveid=None, item_id=None, **kwargs):
+        find_subtitles = self._addon.getSetting('set_subtitle') == 'true' and self._content_type == 'video'
         item = self.get_item(driveid, item_driveid, item_id, find_subtitles)
         file_name = Utils.unicode(item['name'])
         list_item = xbmcgui.ListItem(file_name)
@@ -329,12 +415,9 @@ class CloudDriveAddon(FetchableItem):
     
     def route(self):
         try:
-            if self._addon_params:
-                action = self._addon_params.get('action', [None])[0]
-                if action:
-                    getattr(self, action)();
-                else:
-                    self.get_accounts()
+            Logger.notice(self._addon_params)
+            if self._addon_params and 'action' in self._addon_params:
+                getattr(self, self._addon_params['action'])(**self._addon_params);
             else:
                 self.get_accounts()
         except Exception as ex:
@@ -358,5 +441,8 @@ class CloudDriveAddon(FetchableItem):
         finally:
             self._progress_dialog.close()
             self._progress_dialog_bg.close()
+            self._export_progress_dialog_bg.close()
+            if self._exporting:
+                self._home_window.clearProperty(self._addon_id + 'exporting')
 
 
