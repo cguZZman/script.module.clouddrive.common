@@ -38,7 +38,7 @@ msgid "Connecting with server, please wait..."
 msgstr ""
 
 msgctxt "#32009"
-msgid "Go to URL: http://kodi.daro.mx"
+msgid "Go to URL: %s"
 msgstr ""
 
 msgctxt "#32010"
@@ -78,7 +78,7 @@ msgid "Unable to retrieve the drive information:"
 msgstr ""
 
 msgctxt "#32019"
-msgid "This account already exist."
+msgid "The access to this resource has been denied. You might not have enough permission"
 msgstr ""
 
 msgctxt "#32020"
@@ -134,7 +134,7 @@ msgid "'%s' is not a folder"
 msgstr ""
 
 msgctxt "#32035"
-msgid "%s is temporary unavailable for this operation."
+msgid "The server is temporary unavailable for this operation."
 msgstr ""
 
 msgctxt "#32036"
@@ -142,7 +142,7 @@ msgid "Something went wrong with this operation."
 msgstr ""
 
 msgctxt "#32037"
-msgid "File or folder not found. Make sure is still in your drive or try removing and adding your account again to Kodi."
+msgid "File or folder not found. Make sure is still in your drive."
 msgstr ""
 
 msgctxt "#32038"
@@ -182,11 +182,11 @@ msgid "The credentials for '%s' are no longer valid. You need to sign in again.%
 msgstr ""
 
 msgctxt "#32047"
-msgid "%s of %s items loaded in this folder, please wait..."
+msgid "%s of %s items loaded, please wait..."
 msgstr ""
 
 msgctxt "#32048"
-msgid "%s of %s items loaded from search, please wait..."
+msgid "%s items loaded, please wait..."
 msgstr ""
 
 msgctxt "#32049"
@@ -194,7 +194,7 @@ msgid "Loading %s items in this folder, please wait..."
 msgstr ""
 
 msgctxt "#32050"
-msgid "Loading %s items from search, please wait..."
+msgid "--unused--"
 msgstr ""
 
 msgctxt "#32052"
@@ -206,19 +206,19 @@ msgid "Recent"
 msgstr ""
 
 msgctxt "#32054"
-msgid "Documents"
+msgid "-unused- Documents"
 msgstr ""
 
 msgctxt "#32055"
-msgid "Special: Photos"
+msgid "-unused- Special: Photos"
 msgstr ""
 
 msgctxt "#32056"
-msgid "Special: Music"
+msgid "-unused- Special: Music"
 msgstr ""
 
 msgctxt "#32057"
-msgid "Shared By Me"
+msgid "-unused- Shared By Me"
 msgstr ""
 
 msgctxt "#32058"
@@ -242,7 +242,7 @@ msgid "Subtitle not found for this video"
 msgstr ""
 
 msgctxt "#32063"
-msgid "This account doesn't exist anymore.%sDo you want to add an account?"
+msgid "This account or drive is not registered.%sDo you want to add an account?"
 msgstr ""
 
 msgctxt "#32064"

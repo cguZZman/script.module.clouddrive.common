@@ -25,7 +25,8 @@ import time
 import urllib
 import urlparse
 
-from clouddrive.common.account import AccountManager
+from clouddrive.common.account import AccountManager, AccountNotFoundException,\
+    DriveNotFoundException
 from clouddrive.common.exception import UIException, ExceptionUtils, RequestException
 from clouddrive.common.fetchableitem import FetchableItem
 from clouddrive.common.ui.dialog import DialogProgress, DialogProgressBG
@@ -38,6 +39,11 @@ import xbmcgui
 import xbmcplugin
 import xbmcvfs
 import os
+from clouddrive.common.remote.errorreport import ErrorReport
+import threading
+import urllib2
+from clouddrive.common.remote.signin import Signin
+from urllib2 import HTTPError
 
 
 class CloudDriveAddon(FetchableItem):
@@ -49,6 +55,7 @@ class CloudDriveAddon(FetchableItem):
     _addon_name = None
     _addon_params = None
     _addon_url = None
+    _addon_version = None
     _cache = None
     _common_addon = None
     _cancel_operation = False
@@ -58,6 +65,8 @@ class CloudDriveAddon(FetchableItem):
     _exporting_target = 0
     _exporting_percent = 0
     _exporting_count = 0
+    _load_target = 0
+    _load_count = 0
     _profile_path = None
     _progress_dialog = None
     _progress_dialog_bg = None
@@ -73,6 +82,7 @@ class CloudDriveAddon(FetchableItem):
         self._addon_id = self._addon.getAddonInfo('id')
         self._addon_name = self._addon.getAddonInfo('name')
         self._addon_url = sys.argv[0]
+        self._addon_version = self._addon.getAddonInfo('version')
         self._common_addon = xbmcaddon.Addon('script.module.clouddrive.common')
         self._dialog = xbmcgui.Dialog()
         self._profile_path = Utils.unicode(xbmc.translatePath(self._addon.getAddonInfo('profile')))
@@ -104,18 +114,26 @@ class CloudDriveAddon(FetchableItem):
     def get_my_files_menu_name(self):
         return self._common_addon.getLocalizedString(32052)
     
-    def get_custom_drive_folders(self):
-        return [{'name' : self._common_addon.getLocalizedString(32058), 'folder' : 'shared_with_me'}]
+    def get_custom_drive_folders(self, driveid=None):
+        return
     
-    def get_folder_items(self, driveid=None, item_driveid=None, item_id=None, folder=None):
+    def get_folder_items(self, driveid=None, item_driveid=None, item_id=None, folder=None, on_items_page_completed=None):
         raise NotImplementedError()
     
-    def search(self, query, driveid=None, item_driveid=None, item_id=None):
+    def search(self, query, driveid=None, item_driveid=None, item_id=None, before_pagination=None):
         raise NotImplementedError()
     
     def cancel_operation(self):
         return self._system_monitor.abortRequested() or self._progress_dialog.iscanceled() or self._cancel_operation
 
+    def _get_display_name(self, account, drive):
+        display = account['name']
+        if 'type' in drive and drive['type']:
+            display += ' | ' + self.get_provider().get_drive_type_name(drive['type'])
+        if 'name' in drive and drive['name']:
+            display += ' | ' + drive['name']
+        return display
+                    
     def get_accounts(self):
         accounts = self._account_manager.load()
         listing = []
@@ -133,12 +151,7 @@ class CloudDriveAddon(FetchableItem):
                     params['action'] = '_remove_drive'
                     cmd =  'RunPlugin('+self._addon_url + '?' + urllib.urlencode(params)+')'
                     context_options.append((self._common_addon.getLocalizedString(32007), cmd))
-                display = account['name']
-                if 'type' in drive and drive['type']:
-                    display += ' | ' + self.get_provider().get_drive_type_name(drive['type'])
-                if 'name' in drive and drive['name']:
-                    display += ' | ' + drive['name']
-                list_item = xbmcgui.ListItem(display)
+                list_item = xbmcgui.ListItem(self._get_display_name(account, drive))
                 list_item.addContextMenuItems(context_options)
                 params = {'action':'_list_drive', 'content_type': self._content_type, 'driveid': drive['id']}
                 url = self._addon_url + '?' + urllib.urlencode(params)
@@ -150,7 +163,7 @@ class CloudDriveAddon(FetchableItem):
         xbmcplugin.addDirectoryItems(self._addon_handle, listing, len(listing))
         xbmcplugin.endOfDirectory(self._addon_handle, True)
     
-    def _add_account(self):
+    def _add_account(self, **kwargs):
         request_params = {
             'waiting_retry': lambda request, remaining: self._progress_dialog_bg.update(
                 int((request.current_delay - remaining)/request.current_delay*100),
@@ -172,7 +185,7 @@ class CloudDriveAddon(FetchableItem):
 
         tokens_info = {}
         request_params['on_complete'] = lambda request: self._progress_dialog_bg.close()
-        self._progress_dialog.update(100, self._common_addon.getLocalizedString(32009), self._common_addon.getLocalizedString(32010) % pin_info['pin'])
+        self._progress_dialog.update(100, self._common_addon.getLocalizedString(32009) % Signin._signin_url, self._common_addon.getLocalizedString(32010) % pin_info['pin'])
         current_time = time.time()
         max_waiting_time = current_time + self._DEFAULT_SIGNIN_TIMEOUT
         while not self.cancel_operation() and max_waiting_time > current_time:
@@ -223,12 +236,7 @@ class CloudDriveAddon(FetchableItem):
         self._account_manager.load()
         account = self._account_manager.get_account_by_driveid(driveid)
         drive = self._account_manager.get_drive_by_driveid(driveid)
-        display = account['name']
-        if 'type' in drive and drive['type']:
-            display += ' | ' + self.get_provider().get_drive_type_name(drive['type'])
-        if 'name' in drive and drive['name']:
-            display += ' | ' + drive['name']
-        if self._dialog.yesno(self._addon_name, self._common_addon.getLocalizedString(32023) % display, None):
+        if self._dialog.yesno(self._addon_name, self._common_addon.getLocalizedString(32023) % self._get_display_name(account, drive), None):
             self._account_manager.remove_drive(driveid)
         xbmc.executebuiltin('Container.Refresh')
     
@@ -240,7 +248,7 @@ class CloudDriveAddon(FetchableItem):
         xbmc.executebuiltin('Container.Refresh')
         
     def _list_drive(self, driveid=None, **kwargs):
-        drive_folders = self.get_custom_drive_folders()
+        drive_folders = self.get_custom_drive_folders(driveid)
         if self.cancel_operation():
             return
         if drive_folders:
@@ -257,11 +265,22 @@ class CloudDriveAddon(FetchableItem):
             xbmcplugin.addDirectoryItems(self._addon_handle, listing, len(listing))
             xbmcplugin.endOfDirectory(self._addon_handle, True)
         else:
-            self.list_folder()
+            self._list_folder(driveid=driveid, folder='root')
 
+    def on_items_page_completed(self, items):
+        self._load_count += len(items)
+        if self._load_target > self._load_count:
+            percent = int(round(float(self._load_count)/self._load_target*100))
+            self._progress_dialog_bg.update(percent, self._addon_name, self._common_addon.getLocalizedString(32047) % (Utils.str(self._load_count), Utils.str(self._load_target)))
+        else:
+            self._progress_dialog_bg.update(100, self._addon_name, self._common_addon.getLocalizedString(32048) % Utils.str(self._load_count))
+            
     def _list_folder(self, driveid=None, item_driveid=None, item_id=None, folder=None, **kwargs):
-        self.get_provider().configure(self._account_manager, driveid)
-        items = self.get_folder_items(driveid, item_driveid, item_id, folder)
+        item = self.get_item(driveid, item_driveid, item_id, folder)
+        if item:
+            self._load_target = item['folder']['child_count']
+            self._progress_dialog_bg.create(self._addon_name, self._common_addon.getLocalizedString(32049) % Utils.str(self._load_target))
+        items = self.get_folder_items(driveid, item_driveid, item_id, folder, on_items_page_completed = self.on_items_page_completed)
         if self.cancel_operation():
             return
         self._process_items(items, driveid)
@@ -303,11 +322,11 @@ class CloudDriveAddon(FetchableItem):
                     list_item.setIconImage(item['thumbnail'])
                     list_item.setThumbnailImage(item['thumbnail'])
             elif 'image' in item and self._content_type == 'image' and item_name_extension != 'mp4':
-                params['action'] = 'play'
-                url = self._addon_url + '?' + urllib.urlencode(params)
+                url = 'http://localhost:%s/%s/%s/%s/%s/%s' % (self._common_addon.getSetting('download.sourceservice.port'), self._addon_id, driveid, item_drive_id, item_id, urllib.quote(item_name))
                 list_item.setInfo('pictures', item['image'])
                 if 'thumbnail' in item:
                     list_item.setIconImage(item['thumbnail'])
+                    list_item.setThumbnailImage(item['thumbnail'])
             if url:
                 list_item.setProperty('mimetype', Utils.get_safe_value(item, 'mimetype'))
                 listing.append((url, list_item, is_folder))
@@ -318,8 +337,8 @@ class CloudDriveAddon(FetchableItem):
         query = self._dialog.input(self._addon_name + ' - ' + self._common_addon.getLocalizedString(32042))
         Logger.notice('query = ' + query)
         if query:
-            Logger.notice('searching... [%d]' % self._addon_handle)
-            items = self.search(query, driveid, item_driveid, item_id)
+            self._progress_dialog_bg.create(self._addon_name, self._common_addon.getLocalizedString(32041))
+            items = self.search(query, driveid, item_driveid, item_id, on_items_page_completed = self.on_items_page_completed)
             Logger.notice('result size = %d ' % len(items))
             if self.cancel_operation():
                 return
@@ -395,7 +414,7 @@ class CloudDriveAddon(FetchableItem):
     
     def play(self, driveid=None, item_driveid=None, item_id=None, **kwargs):
         find_subtitles = self._addon.getSetting('set_subtitle') == 'true' and self._content_type == 'video'
-        item = self.get_item(driveid, item_driveid, item_id, find_subtitles)
+        item = self.get_item(driveid, item_driveid, item_id, find_subtitles=find_subtitles)
         file_name = Utils.unicode(item['name'])
         list_item = xbmcgui.ListItem(file_name)
         if 'audio' in item:
@@ -413,6 +432,69 @@ class CloudDriveAddon(FetchableItem):
             list_item.setSubtitles(subtitles)
         xbmcplugin.setResolvedUrl(self._addon_handle, True, list_item)
     
+    def _handle_exception(self, ex):
+        stacktrace = ExceptionUtils.full_stacktrace(ex)
+        rex = ExceptionUtils.extract_exception(ex, RequestException)
+        uiex = ExceptionUtils.extract_exception(ex, UIException)
+        httpex = ExceptionUtils.extract_exception(ex, HTTPError)
+        
+        line1 = self._common_addon.getLocalizedString(32027)
+        line2 = Utils.unicode(ex)
+        line3 = self._common_addon.getLocalizedString(32016)
+        
+        if uiex:
+            line1 = self._common_addon.getLocalizedString(int(Utils.str(uiex)))
+            line2 = Utils.unicode(uiex.root_exception)
+        elif rex and rex.response:
+            line1 += ' ' + Utils.unicode(rex)
+            line2 = Utils.str(rex.response)
+        
+        show_error_dialog = True
+        send_report = self._common_addon.getSetting('report_error') == 'true'
+        add_account_cmd = 'RunPlugin('+self._addon_url + '?' + urllib.urlencode({'action':'_add_account', 'content_type': self._content_type})+')'
+        if isinstance(ex, AccountNotFoundException) or isinstance(ex, DriveNotFoundException):
+            show_error_dialog = False
+            if self._dialog.yesno(self._addon_name, self._common_addon.getLocalizedString(32063) % '\n'):
+                xbmc.executebuiltin(add_account_cmd)
+        elif rex and httpex:
+            if httpex.code >= 500:
+                self._dialog.ok(self._addon_name, self._common_addon.getLocalizedString(32035), self._common_addon.getLocalizedString(32038))
+            elif httpex.code >= 400:
+                driveid = self._addon_params['driveid']
+                self._account_manager.load()
+                account = self._account_manager.get_account_by_driveid(driveid)
+                drive = self._account_manager.get_drive_by_driveid(driveid)
+                if Signin._signin_url in rex.request or httpex.code == 401:
+                    send_report = False
+                    show_error_dialog = False
+                    if self._dialog.yesno(self._addon_name, self._common_addon.getLocalizedString(32046) % (self._get_display_name(account, drive), '\n')):
+                        xbmc.executebuiltin(add_account_cmd)
+                elif httpex.code == 403:
+                    line1 = self._common_addon.getLocalizedString(32019)
+                    line2 = None
+                    line3 = None
+                elif httpex.code == 404:
+                    line1 = self._common_addon.getLocalizedString(32037)
+                    line2 = None
+                    line3 = None
+                else:
+                    line1 = self._common_addon.getLocalizedString(32036)
+                    line3 = self._common_addon.getLocalizedString(32038)
+        report = '[%s] [%s]\n\n%s\n%s\n%s\n\n%s' % (self._addon_id, self._addon_version, line1, line2, line3, stacktrace)
+        if rex:
+            report += '\n\n%s\nResponse:\n%s' % (rex.request, rex.response)
+        report += '\n\nshow_error_dialog: %s' % show_error_dialog
+        Logger.notice(report)
+        if send_report:
+            self._send_report(report)
+        if show_error_dialog:
+            self._dialog.ok(self._addon_name, line1, line2, line3)
+    
+    def _send_report(self, report):
+        t = threading.Thread(target=ErrorReport().send_report, args=(report,))
+        t.setDaemon(True)
+        t.start()
+    
     def route(self):
         try:
             Logger.notice(self._addon_params)
@@ -421,23 +503,7 @@ class CloudDriveAddon(FetchableItem):
             else:
                 self.get_accounts()
         except Exception as ex:
-            Logger.notice(ExceptionUtils.full_stacktrace(ex))
-            rex = ExceptionUtils.extract_exception(ex, RequestException)
-            uiex = ExceptionUtils.extract_exception(ex, UIException)
-            
-            line1 = self._common_addon.getLocalizedString(32027)
-            line2 = Utils.unicode(ex)
-            line3 = self._common_addon.getLocalizedString(32016)
-            
-            if uiex:
-                line1 = self._common_addon.getLocalizedString(int(Utils.str(uiex)))
-                line2 = Utils.unicode(uiex.root_exception)
-            elif rex and rex.response:
-                line1 += ' ' + Utils.unicode(rex)
-                line2 = Utils.str(rex.response)
-                Logger.notice('Response from provider: ' + line2)
-                    
-            self._dialog.ok(self._addon_name, line1, line2, line3)
+            self._handle_exception(ex)
         finally:
             self._progress_dialog.close()
             self._progress_dialog_bg.close()

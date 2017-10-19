@@ -21,7 +21,7 @@ class SimpleCache(object):
     enable_mem_cache = True
     global_checksum = None
     _exit = False
-    _auto_clean_interval = datetime.timedelta(hours=4)
+    _auto_clean_interval = datetime.timedelta(minutes=1)
     _win = None
     _busy_tasks = []
     _database = None

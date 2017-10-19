@@ -57,14 +57,14 @@ class AccountManager(object):
             for drive in self.accounts[accountid]['drives']:
                 if drive['id'] == driveid:
                     return self.accounts[accountid]
-        raise AccountNotFoundException()
+        raise AccountNotFoundException(driveid)
     
     def get_drive_by_driveid(self, driveid):
         for account_id in self.accounts:
             for drive in self.accounts[account_id]['drives']:
                 if drive['id'] == driveid:
                     return drive
-        raise DriveNotFoundException()
+        raise DriveNotFoundException(driveid)
     
     def save(self):
         with open(self._config_path, 'wb') as fo:

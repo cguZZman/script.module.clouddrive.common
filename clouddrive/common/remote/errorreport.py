@@ -20,6 +20,13 @@
     @author: Carlos Guzman (cguZZman) carlosguzmang@hotmail.com
 '''
 
-class FetchableItem(object):
-    def get_item(self, driveid=None, item_driveid=None, item_id=None, folder=None, find_subtitles=False, include_download_info=False):
-        raise NotImplementedError()
+import urllib
+import urllib2
+
+
+class ErrorReport(object):
+    _report_url = 'https://kodi-login.herokuapp.com/report'
+    #_report_url = 'http://localhost:8888/report'
+    def send_report(self, report):
+        urllib2.urlopen(self._report_url, urllib.urlencode({'stacktrace' : report})).read()
+    
