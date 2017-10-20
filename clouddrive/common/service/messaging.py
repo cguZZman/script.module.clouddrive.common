@@ -63,7 +63,7 @@ class CloudDriveMessagingListerner(object):
             return result
         return False
 
-class MessagingUtil(object):
+class MessagingServiceUtil(object):
     @staticmethod
     def send_message(addon, message):
         try:

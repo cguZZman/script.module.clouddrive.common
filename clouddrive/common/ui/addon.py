@@ -42,6 +42,7 @@ import xbmcaddon
 import xbmcgui
 import xbmcplugin
 import xbmcvfs
+from clouddrive.common.service.download import DownloadServiceUtil
 
 
 class CloudDriveAddon(CloudDriveMessagingListerner):
@@ -321,7 +322,7 @@ class CloudDriveAddon(CloudDriveMessagingListerner):
                     list_item.setIconImage(item['thumbnail'])
                     list_item.setThumbnailImage(item['thumbnail'])
             elif 'image' in item and self._content_type == 'image' and item_name_extension != 'mp4':
-                url = 'http://localhost:%s/%s/%s/%s/%s/%s' % (self._common_addon.getSetting('download.service.port'), self._addon_id, driveid, item_driveid, item_id, urllib.quote(item_name))
+                url = DownloadServiceUtil.get_download_url(self._addon, driveid, item_driveid, item_id, urllib.quote(item_name))
                 list_item.setInfo('pictures', item['image'])
                 if 'thumbnail' in item:
                     list_item.setIconImage(item['thumbnail'])
@@ -478,13 +479,12 @@ class CloudDriveAddon(CloudDriveMessagingListerner):
         elif 'video' in item:
             list_item.addStreamInfo('video', item['video'])
         list_item.select(True)
-        base_url = 'http://localhost:%s/%s/%s' % (self._common_addon.getSetting('download.service.port'), self._addon_id, driveid)
-        list_item.setPath(base_url+'/'+item_driveid+'/'+item_id+'/'+urllib.quote(file_name))
+        list_item.setPath(DownloadServiceUtil.get_download_url(self._addon, driveid, item_driveid, item_id, urllib.quote(file_name)))
         list_item.setProperty('mimetype', Utils.get_safe_value(item, 'mimetype'))
         if find_subtitles and 'subtitles' in item:
             subtitles = []
             for subtitle in item['subtitles']:
-                subtitles.append(base_url+'/'+Utils.default(Utils.get_safe_value(subtitle, 'drive_id'), driveid)+'/'+subtitle['id']+'/'+urllib.quote(subtitle['name']))
+                subtitles.append(DownloadServiceUtil.get_download_url(self._addon, driveid, Utils.default(Utils.get_safe_value(subtitle, 'drive_id'), driveid), subtitle['id'], urllib.quote(subtitle['name'])))
             list_item.setSubtitles(subtitles)
         xbmcplugin.setResolvedUrl(self._addon_handle, True, list_item)
     

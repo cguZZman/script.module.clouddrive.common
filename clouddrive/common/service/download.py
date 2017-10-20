@@ -24,7 +24,7 @@ import json
 from urlparse import urlparse
 
 from clouddrive.common.service.base import BaseService, BaseHandler
-from clouddrive.common.service.messaging import MessagingUtil
+from clouddrive.common.service.messaging import MessagingServiceUtil
 from clouddrive.common.ui.utils import UIUtils
 
 
@@ -47,10 +47,16 @@ class Download(BaseHandler):
                 'include_download_info' : True
             }
         })
-        result = MessagingUtil.send_message(UIUtils.get_addon(data[1]), message)
+        result = MessagingServiceUtil.send_message(UIUtils.get_addon(data[1]), message)
         url = result['download_info']['url']
         self.send_response(307)
         self.send_header('location', url)
         self.end_headers()
         return
+
+class DownloadServiceUtil(object):
+    @staticmethod
+    def get_download_url(addon, driveid, item_driveid, item_id, name):
+        return 'http://localhost:%s/%s/%s/%s/%s/%s' % (UIUtils.get_addon('script.module.clouddrive.common').getSetting('download.service.port'), addon.getAddonInfo('id'), driveid, item_driveid, item_id, name)
+        
         
