@@ -129,6 +129,10 @@ msgctxt "#32031"
 msgid "Report errors automatically to help resolve them quickly"
 msgstr ""
 
+msgctxt "#32032"
+msgid "Auto-Refreshed slideshow"
+msgstr ""
+
 msgctxt "#32034"
 msgid "'%s' is not a folder"
 msgstr ""
@@ -262,7 +266,7 @@ msgid "Services"
 msgstr ""
 
 msgctxt "#32068"
-msgid "Allow %s addon to be used as a source"
+msgid "Allow cloud drive addons to be used as a source"
 msgstr ""
 
 msgctxt "#32069"

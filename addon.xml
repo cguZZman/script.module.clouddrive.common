@@ -5,8 +5,7 @@
 		<import addon="xbmc.python" version="2.19.0" />
 	</requires>
 	<extension point="xbmc.python.module" library="/" />
-	<extension point="xbmc.service" library="downloadservice.py" start="login" />
-	<extension point="xbmc.service" library="sourceservice.py" start="login" />
+	<extension point="xbmc.service" library="service.py" start="login" />
 	<extension point="xbmc.addon.metadata">
 		<platform>all</platform>
 		<summary lang="en">Cloud Drive Common Module</summary>

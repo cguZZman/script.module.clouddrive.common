@@ -18,7 +18,6 @@ ADDON_ID = "script.module.clouddrive.common"
 
 class SimpleCache(object):
     '''simple stateless caching system for Kodi'''
-    enable_mem_cache = True
     global_checksum = None
     _exit = False
     _auto_clean_interval = datetime.timedelta(minutes=1)
@@ -54,16 +53,7 @@ class SimpleCache(object):
         '''
         checksum = self._get_checksum(checksum)
         cur_time = self._get_timestamp(datetime.datetime.now())
-        result = None
-        # 1: try memory cache first
-        if self.enable_mem_cache:
-            result = self._get_mem_cache(endpoint, checksum, cur_time)
-
-        # 2: fallback to _database cache
-        if result is None:
-            result = self._get_db_cache(endpoint, checksum, cur_time)
-
-        return result
+        return self._get_db_cache(endpoint, checksum, cur_time)
 
     def set(self, endpoint, data, checksum="", expiration=datetime.timedelta(days=30)):
         '''
@@ -73,10 +63,6 @@ class SimpleCache(object):
         self._busy_tasks.append(task_name)
         checksum = self._get_checksum(checksum)
         expires = self._get_timestamp(datetime.datetime.now() + expiration)
-
-        # memory cache: write to window property
-        if self.enable_mem_cache and not self._exit:
-            self._set_mem_cache(endpoint, checksum, expires, data)
 
         # db cache
         if not self._exit:
@@ -95,42 +81,16 @@ class SimpleCache(object):
             # cleanup needed...
             self._do_cleanup()
 
-    def _get_mem_cache(self, endpoint, checksum, cur_time):
-        '''
-            get cache data from memory cache
-            we use window properties because we need to be stateless
-        '''
-        result = None
-        cachedata = self._win.getProperty(ADDON_ID + endpoint.encode("utf-8"))
-        if cachedata:
-            cachedata = eval(cachedata)
-            if cachedata[0] > cur_time:
-                if not checksum or checksum == cachedata[2]:
-                    result = cachedata[1]
-        return result
-
-    def _set_mem_cache(self, endpoint, checksum, expires, data):
-        '''
-            window property cache as alternative for memory cache
-            usefull for (stateless) plugins
-        '''
-        cachedata = (expires, data, checksum)
-        cachedata_str = repr(cachedata).encode("utf-8")
-        self._win.setProperty(ADDON_ID + endpoint.encode("utf-8"), cachedata_str)
-
     def _get_db_cache(self, endpoint, checksum, cur_time):
         '''get cache data from sqllite _database'''
         result = None
         query = "SELECT expires, data, checksum FROM simplecache WHERE id = ?"
         cache_data = self._execute_sql(query, (endpoint,))
+        cache_data = cache_data.fetchone() if cache_data else None
         if cache_data:
-            cache_data = cache_data.fetchone()
-            if cache_data and cache_data[0] > cur_time:
+            if cache_data[0] > cur_time:
                 if not checksum or cache_data[2] == checksum:
                     result = eval(cache_data[1])
-                    # also set result in memory cache for further access
-                    if self.enable_mem_cache:
-                        self._set_mem_cache(endpoint, checksum, cache_data[0], result)
         return result
 
     def _set_db_cache(self, endpoint, checksum, expires, data):
@@ -151,20 +111,8 @@ class SimpleCache(object):
             return
         self._win.setProperty(ADDON_ID + "simplecachecleanbusy", "busy")
 
-        query = "SELECT id, expires FROM simplecache"
-        for cache_data in self._execute_sql(query).fetchall():
-            cache_id = cache_data[0]
-            cache_expires = cache_data[1]
-            if self._exit or self._monitor.abortRequested():
-                return
-            # always cleanup all memory objects on each interval
-            self._win.clearProperty(ADDON_ID + cache_id.encode("utf-8"))
-            # clean up db cache object only if expired
-            if cache_expires < cur_timestamp:
-                query = 'DELETE FROM simplecache WHERE id = ?'
-                self._execute_sql(query, (cache_id,))
-                self._log_msg("delete from db %s" % cache_id)
-
+        query = "delete FROM simplecache where expires < ?"
+        self._execute_sql(query, (cur_timestamp,))
         # compact db
         self._execute_sql("VACUUM")
 
@@ -236,7 +184,7 @@ class SimpleCache(object):
         '''helper to send a message to the kodi log'''
         if isinstance(msg, unicode):
             msg = msg.encode('utf-8')
-        Logger.notice(msg)
+        Logger.debug(msg)
 
     @staticmethod
     def _get_timestamp(date_time):

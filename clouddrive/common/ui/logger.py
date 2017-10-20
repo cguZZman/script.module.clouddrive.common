@@ -27,7 +27,7 @@ import xbmcaddon
 class Logger:
     @staticmethod
     def _log(msg, level):
-        xbmc.log('[' + xbmcaddon.Addon().getAddonInfo('id') + '] - ' + Utils.str(msg), level)
+        xbmc.log('[' + xbmcaddon.Addon().getAddonInfo('id') + '] ' + Utils.str(msg), level)
         
     @staticmethod
     def debug(msg):

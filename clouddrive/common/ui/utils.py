@@ -19,7 +19,19 @@
     Created on Mar 1, 2015
     @author: Carlos Guzman (cguZZman) carlosguzmang@hotmail.com
 '''
+import xbmc
+import xbmcaddon
 
-class FetchableItem(object):
-    def get_item(self, driveid=None, item_driveid=None, item_id=None, folder=None, find_subtitles=False, include_download_info=False):
-        raise NotImplementedError()
+class UIUtils:
+    
+    @staticmethod
+    def get_addon(addon_id=None):
+        if addon_id:
+            return xbmcaddon.Addon(addon_id)
+        else:
+            return xbmcaddon.Addon()
+    
+    @staticmethod
+    def get_addon_monitor():
+        return xbmc.Monitor()
+    

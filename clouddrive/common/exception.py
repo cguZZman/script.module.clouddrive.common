@@ -20,6 +20,7 @@
     @author: Carlos Guzman (cguZZman) carlosguzmang@hotmail.com
 '''
 import traceback
+import json
 
 
 
@@ -63,3 +64,13 @@ class ExceptionUtils:
                 break
             e = None if not isinstance(e, WrappedException) else e.root_exception
         return exception
+    
+    
+    @staticmethod
+    def extract_error_message(response):
+        try:
+            error = json.loads(response)['error']
+            return '%s - %s' % (error['code'], error['message'])
+        except:
+            return response
+            

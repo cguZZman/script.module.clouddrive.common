@@ -20,8 +20,9 @@
     @author: Carlos Guzman (cguZZman) carlosguzmang@hotmail.com
 '''
 from clouddrive.common.service.download import DownloadService
-
+from clouddrive.common.service.source import SourceService
+from clouddrive.common.service.base import BaseService
 
 if __name__ == '__main__':
-    DownloadService().start()
+    BaseService.run([DownloadService(), SourceService()])
     

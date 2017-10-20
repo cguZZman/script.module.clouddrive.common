@@ -20,35 +20,32 @@
     @author: Carlos Guzman (cguZZman) carlosguzmang@hotmail.com
 '''
 
+import os
 import sys
+import threading
 import time
 import urllib
+from urllib2 import HTTPError
 import urlparse
 
-from clouddrive.common.account import AccountManager, AccountNotFoundException,\
+from clouddrive.common.account import AccountManager, AccountNotFoundException, \
     DriveNotFoundException
 from clouddrive.common.exception import UIException, ExceptionUtils, RequestException
-from clouddrive.common.fetchableitem import FetchableItem
+from clouddrive.common.remote.errorreport import ErrorReport
+from clouddrive.common.remote.signin import Signin
+from clouddrive.common.service.messaging import CloudDriveMessagingListerner
 from clouddrive.common.ui.dialog import DialogProgress, DialogProgressBG
 from clouddrive.common.ui.logger import Logger
 from clouddrive.common.utils import Utils
-
 import xbmc
 import xbmcaddon
 import xbmcgui
 import xbmcplugin
 import xbmcvfs
-import os
-from clouddrive.common.remote.errorreport import ErrorReport
-import threading
-import urllib2
-from clouddrive.common.remote.signin import Signin
-from urllib2 import HTTPError
 
 
-class CloudDriveAddon(FetchableItem):
+class CloudDriveAddon(CloudDriveMessagingListerner):
     _DEFAULT_SIGNIN_TIMEOUT = 120
-    
     _addon = None
     _addon_handle = None
     _addon_id = None
@@ -260,8 +257,10 @@ class CloudDriveAddon(FetchableItem):
                 if 'params' in folder:
                     params.update(folder['params'])
                 url = self._addon_url + '?' + urllib.urlencode(params)
-                listing.append((url, xbmcgui.ListItem(folder['name']), True))
-                
+                list_item = xbmcgui.ListItem(folder['name'])
+                if 'context_options' in folder:
+                    list_item.addContextMenuItems(folder['context_options'])
+                listing.append((url, list_item, True))
             xbmcplugin.addDirectoryItems(self._addon_handle, listing, len(listing))
             xbmcplugin.endOfDirectory(self._addon_handle, True)
         else:
@@ -291,11 +290,11 @@ class CloudDriveAddon(FetchableItem):
             item_id = item['id']
             item_name = item['name']
             item_name_extension = item['name_extension']
-            item_drive_id = Utils.default(Utils.get_safe_value(item, 'drive_id'), driveid)
+            item_driveid = Utils.default(Utils.get_safe_value(item, 'drive_id'), driveid)
             list_item = xbmcgui.ListItem(item_name)
             url = None
             is_folder = 'folder' in item
-            params = {'content_type': self._content_type, 'item_driveid': item_drive_id, 'item_id': item_id, 'driveid': driveid}
+            params = {'content_type': self._content_type, 'item_driveid': item_driveid, 'item_id': item_id, 'driveid': driveid}
             if is_folder:
                 params['action'] = '_list_folder'
                 url = self._addon_url + '?' + urllib.urlencode(params)
@@ -322,7 +321,7 @@ class CloudDriveAddon(FetchableItem):
                     list_item.setIconImage(item['thumbnail'])
                     list_item.setThumbnailImage(item['thumbnail'])
             elif 'image' in item and self._content_type == 'image' and item_name_extension != 'mp4':
-                url = 'http://localhost:%s/%s/%s/%s/%s/%s' % (self._common_addon.getSetting('download.sourceservice.port'), self._addon_id, driveid, item_drive_id, item_id, urllib.quote(item_name))
+                url = 'http://localhost:%s/%s/%s/%s/%s/%s' % (self._common_addon.getSetting('download.service.port'), self._addon_id, driveid, item_driveid, item_id, urllib.quote(item_name))
                 list_item.setInfo('pictures', item['image'])
                 if 'thumbnail' in item:
                     list_item.setIconImage(item['thumbnail'])
@@ -343,6 +342,63 @@ class CloudDriveAddon(FetchableItem):
             if self.cancel_operation():
                 return
             self._process_items(items, driveid)
+    
+    def _slideshow(self, driveid=None, item_driveid=None, item_id=None, folder=None, old_child_count=0, **kwargs):
+        item = self.get_item(driveid, item_driveid, item_id, folder)
+        if self.cancel_operation():
+            return
+        if item:
+            wait_for_slideshow = False
+            child_count = item['folder']['child_count']
+            if old_child_count != child_count:
+                if child_count >= 0:
+                    Logger.debug('Slideshow child count changed. Refreshing slideshow...')
+                params = {'action':'_list_folder', 'content_type': self._content_type,
+                          'item_driveid': Utils.default(item_driveid, ''), 'item_id': Utils.default(item_id, ''), 'driveid': Utils.default(driveid, ''), 'folder' : Utils.default(folder, ''),
+                          'child_count': child_count}
+                extra_params = ',recursive' if self._addon.getSetting('slideshow_recursive') == 'true' else ''
+                xbmc.executebuiltin('SlideShow('+self._addon_url + '?' + urllib.urlencode(params) + extra_params + ')')
+                wait_for_slideshow = True
+            else:
+                Logger.debug('Slideshow child count is the same, nothing to refresh...')
+            t = threading.Thread(target=self._refresh_slideshow, args=(driveid, item_driveid, item_id, folder, child_count, wait_for_slideshow,))
+            t.setDaemon(True)
+            t.start()
+    
+    def _refresh_slideshow(self, driveid, item_driveid, item_id, folder, child_count, wait_for_slideshow):
+        if wait_for_slideshow:
+            Logger.debug('Waiting up to 10 minutes until the slideshow for folder %s starts...' % Utils.default(item_id, folder))
+            current_time = time.time()
+            max_waiting_time = current_time + 10 * 60
+            while not self.cancel_operation() and not xbmc.getCondVisibility('Slideshow.IsActive') and max_waiting_time > current_time:
+                if self._system_monitor.waitForAbort(2):
+                    break
+                current_time = time.time()
+            self._print_slideshow_info()
+        interval = self._addon.getSetting('slideshow_refresh_interval')
+        Logger.debug('Waiting up to %s minute(s) to check if it is needed to refresh the slideshow of folder %s...' % (interval, Utils.default(item_id, folder)))
+        current_time = time.time()
+        target_time = current_time + int(interval) * 60
+        while not self.cancel_operation() and target_time > current_time and xbmc.getCondVisibility('Slideshow.IsActive'):
+            if self._system_monitor.waitForAbort(10):
+                break
+            current_time = time.time()
+        self._print_slideshow_info()
+        if not self.cancel_operation() and xbmc.getCondVisibility('Slideshow.IsActive'):
+            try:
+                self._slideshow(driveid, item_driveid, item_id, folder, child_count)
+            except Exception as e:
+                Logger.error('Slideshow failed to auto refresh. Will be restarted when possible. Error: ')
+                Logger.error(ExceptionUtils.full_stacktrace(e))
+                self._refresh_slideshow(driveid, item_driveid, item_id, folder, -1, wait_for_slideshow)
+        else:
+            Logger.notice('Slideshow is not running anymore or abort requested.')
+        
+    def _print_slideshow_info(self):
+        if xbmc.getCondVisibility('Slideshow.IsActive'):
+            Logger.debug('Slideshow is there...')
+        elif self.cancel_operation():
+            Logger.debug('Abort requested...')
         
     def _export_folder(self, driveid=None, item_driveid=None, item_id=None, **kwargs):
         if self._home_window.getProperty(self._addon_id + 'exporting'):
@@ -422,7 +478,7 @@ class CloudDriveAddon(FetchableItem):
         elif 'video' in item:
             list_item.addStreamInfo('video', item['video'])
         list_item.select(True)
-        base_url = 'http://localhost:%s/%s/%s' % (self._common_addon.getSetting('download.sourceservice.port'), self._addon_id, driveid)
+        base_url = 'http://localhost:%s/%s/%s' % (self._common_addon.getSetting('download.service.port'), self._addon_id, driveid)
         list_item.setPath(base_url+'/'+item_driveid+'/'+item_id+'/'+urllib.quote(file_name))
         list_item.setProperty('mimetype', Utils.get_safe_value(item, 'mimetype'))
         if find_subtitles and 'subtitles' in item:
@@ -447,7 +503,7 @@ class CloudDriveAddon(FetchableItem):
             line2 = Utils.unicode(uiex.root_exception)
         elif rex and rex.response:
             line1 += ' ' + Utils.unicode(rex)
-            line2 = Utils.str(rex.response)
+            line2 = ExceptionUtils.extract_error_message(rex.response)
         
         show_error_dialog = True
         send_report = self._common_addon.getSetting('report_error') == 'true'
@@ -458,7 +514,8 @@ class CloudDriveAddon(FetchableItem):
                 xbmc.executebuiltin(add_account_cmd)
         elif rex and httpex:
             if httpex.code >= 500:
-                self._dialog.ok(self._addon_name, self._common_addon.getLocalizedString(32035), self._common_addon.getLocalizedString(32038))
+                line1 = self._common_addon.getLocalizedString(32035)
+                line3 = self._common_addon.getLocalizedString(32038)
             elif httpex.code >= 400:
                 driveid = self._addon_params['driveid']
                 self._account_manager.load()
@@ -484,7 +541,7 @@ class CloudDriveAddon(FetchableItem):
         if rex:
             report += '\n\n%s\nResponse:\n%s' % (rex.request, rex.response)
         report += '\n\nshow_error_dialog: %s' % show_error_dialog
-        Logger.notice(report)
+        Logger.error(report)
         if send_report:
             self._send_report(report)
         if show_error_dialog:
@@ -495,6 +552,9 @@ class CloudDriveAddon(FetchableItem):
         t.setDaemon(True)
         t.start()
     
+    def _open_common_settings(self, **kwargs):
+        self._common_addon.openSettings()
+        
     def route(self):
         try:
             Logger.notice(self._addon_params)

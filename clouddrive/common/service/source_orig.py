@@ -26,27 +26,52 @@ import urllib
 
 from clouddrive.common.account import AccountManager
 from clouddrive.common.html import HTML
-from clouddrive.common.service.base import BaseService, BaseHandler
 from clouddrive.common.utils import Utils
 import xbmc
 import xbmcaddon
 import xbmcgui
+import SocketServer
+import socket
+from clouddrive.common.ui.logger import Logger
 
 
-class SourceService(BaseService):
+class SourceService(object):
+    _interface = '127.0.0.1'
+    _addon = None
+    _addon_name = None
+    
     def __init__(self):
-        super(SourceService, self).__init__()
-        self._service_name = 'source'
-        self._handler = Source
+        SocketServer.TCPServer.allow_reuse_address = True
+        self._addon = xbmcaddon.Addon()
+        self._addon_name = self._addon.getAddonInfo('name')
     
-    def get_port(self):
-        return int(self._addon.getSetting('port_directory_listing'))
-    
-    def start(self):
+    def start_source_server(self):
         if self._addon.getSetting('allow_directory_listing') == 'true':
-            super(SourceService, self).start()
-    
-class Source(BaseHandler):
+            source_service_port = int(self._addon.getSetting('port_directory_listing'))
+            source_server = SocketServer.TCPServer((self._interface, source_service_port), Source)
+            source_server.server_activate()
+            source_server.timeout = 1
+            source_service_thread = threading.Thread(target=source_server.serve_forever)
+            source_service_thread.daemon = True
+            source_service_thread.start()
+            Logger.notice(self._addon_name + ' - Source Service Port: ' + str(source_service_port))
+            return source_server
+        
+    def start(self):
+        source_server = self.start_source_server()
+        monitor = xbmc.Monitor()
+        while not monitor.abortRequested():
+            if monitor.waitForAbort(1):
+                if source_server:
+                    source_server.shutdown()
+                break
+        if source_server:
+            source_server.server_close()
+            source_server.socket.close()
+            source_server.shutdown()
+        Logger.notice(self._addon_name + ' Source Service Stopped.')
+
+class Source(BaseHTTPServer.BaseHTTPRequestHandler):
 
     html_header = '<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2 Final//EN">'
     content_type = 'text/html;charset=UTF-8'
@@ -166,7 +191,14 @@ class Source(BaseHandler):
             self.send_header('Location', f['@microsoft.graph.downloadUrl'])
         self.end_headers()
     
+    def do_HEAD(self):
+        self.do_GET()
+        return
+    
     def do_GET(self):
+        response = xbmc.executeJSONRPC('{ "jsonrpc": "2.0", "method": "Addons.GetAddons", "params":{"type":"xbmc.python.pluginsource", "enabled":true, "installed":true, "properties":["dependencies"]}, "id": 1}')
+        Logger.notice(type(response))
+        Logger.notice(response)
         parts = self.path.split('/')
         account = parts[1]
         xbmc.log('method is: ' + self.command, xbmc.LOGDEBUG)
