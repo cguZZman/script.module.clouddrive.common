@@ -33,6 +33,7 @@ from clouddrive.common.account import AccountManager, AccountNotFoundException, 
 from clouddrive.common.exception import UIException, ExceptionUtils, RequestException
 from clouddrive.common.remote.errorreport import ErrorReport
 from clouddrive.common.remote.signin import Signin
+from clouddrive.common.service.download import DownloadServiceUtil
 from clouddrive.common.service.messaging import CloudDriveMessagingListerner
 from clouddrive.common.ui.dialog import DialogProgress, DialogProgressBG
 from clouddrive.common.ui.logger import Logger
@@ -42,7 +43,6 @@ import xbmcaddon
 import xbmcgui
 import xbmcplugin
 import xbmcvfs
-from clouddrive.common.service.download import DownloadServiceUtil
 
 
 class CloudDriveAddon(CloudDriveMessagingListerner):

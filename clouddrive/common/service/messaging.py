@@ -56,7 +56,7 @@ class CloudDriveMessagingListerner(object):
             args = Utils.get_safe_value(msg, 'args', [])
             kwargs = Utils.get_safe_value(msg, 'kwargs', {})
             try:
-                result = repr(getattr(self, msg['action'])(*args, **kwargs))
+                result = repr(getattr(self, msg['method'])(*args, **kwargs))
             except Exception as e:
                 result = False
                 Logger.error(ExceptionUtils.full_stacktrace(e))
