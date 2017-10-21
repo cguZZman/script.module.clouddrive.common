@@ -27,6 +27,7 @@ from clouddrive.common.exception import ExceptionUtils
 from clouddrive.common.service.base import BaseService, BaseHandler
 from clouddrive.common.ui.logger import Logger
 from clouddrive.common.utils import Utils
+from clouddrive.common.ui.utils import KodiUtils
 
 
 class MessagingService(BaseService):
@@ -40,6 +41,7 @@ class MessagingRequestHandler(BaseHandler):
         self.send_response(200)
         size = int(self.headers.getheader('content-length', 0))
         message = self.rfile.read(size)
+        Logger.debug('Message received:\n%s' % message)
         response = self.server.data.on_message(message, self)
         if type(response) is list or type(response) is dict:
             response = json.dumps(response)
@@ -47,6 +49,7 @@ class MessagingRequestHandler(BaseHandler):
             response = Utils.str(response)
         self.end_headers()
         self.wfile.write(response)
+        Logger.debug('Message response:\n%s' % response)
         return
 
 class CloudDriveMessagingListerner(object):
@@ -64,10 +67,20 @@ class CloudDriveMessagingListerner(object):
         return False
 
 class MessagingServiceUtil(object):
+    
     @staticmethod
-    def send_message(addon, message):
+    def execute_remote_method(addonid, method, args=None, kwargs=None):
+        message = {'method' : method}
+        if args:
+            message['args'] = args
+        if kwargs:
+            message['kwargs'] = kwargs
+        return MessagingServiceUtil.send_message(addonid, json.dumps(message))
+    
+    @staticmethod
+    def send_message(addonid, message):
         try:
-            req = urllib2.Request('http://localhost:' + addon.getSetting('messaging.service.port'), message, {'content-length': len(message)})
+            req = urllib2.Request('http://localhost:' + KodiUtils.get_addon_setting('messaging.service.port', addonid), message, {'content-length': len(message)})
             result = eval(urllib2.urlopen(req).read())
         except Exception as e:
             result = False

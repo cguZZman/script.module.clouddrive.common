@@ -13,7 +13,7 @@ import sqlite3
 from functools import reduce
 from clouddrive.common.ui.logger import Logger
 
-ADDON_ID = "script.module.clouddrive.common"
+ADDONID = "script.module.clouddrive.common"
 
 
 class SimpleCache(object):
@@ -74,9 +74,9 @@ class SimpleCache(object):
     def check_cleanup(self):
         '''check if cleanup is needed - public method, may be called by calling addon'''
         cur_time = datetime.datetime.now()
-        lastexecuted = self._win.getProperty(ADDON_ID + "simplecache.clean.lastexecuted")
+        lastexecuted = self._win.getProperty(ADDONID + "simplecache.clean.lastexecuted")
         if not lastexecuted:
-            self._win.setProperty(ADDON_ID + "simplecache.clean.lastexecuted", repr(cur_time))
+            self._win.setProperty(ADDONID + "simplecache.clean.lastexecuted", repr(cur_time))
         elif (eval(lastexecuted) + self._auto_clean_interval) < cur_time:
             # cleanup needed...
             self._do_cleanup()
@@ -107,9 +107,9 @@ class SimpleCache(object):
         cur_time = datetime.datetime.now()
         cur_timestamp = self._get_timestamp(cur_time)
         self._log_msg("Running cleanup...")
-        if self._win.getProperty(ADDON_ID + "simplecachecleanbusy"):
+        if self._win.getProperty(ADDONID + "simplecachecleanbusy"):
             return
-        self._win.setProperty(ADDON_ID + "simplecachecleanbusy", "busy")
+        self._win.setProperty(ADDONID + "simplecachecleanbusy", "busy")
 
         query = "delete FROM simplecache where expires < ?"
         self._execute_sql(query, (cur_timestamp,))
@@ -118,13 +118,13 @@ class SimpleCache(object):
 
         # remove task from list
         self._busy_tasks.remove(__name__)
-        self._win.setProperty(ADDON_ID + "simplecache.clean.lastexecuted", repr(cur_time))
-        self._win.clearProperty(ADDON_ID + "simplecachecleanbusy")
+        self._win.setProperty(ADDONID + "simplecache.clean.lastexecuted", repr(cur_time))
+        self._win.clearProperty(ADDONID + "simplecachecleanbusy")
         self._log_msg("Auto cleanup done")
 
     def _get_database(self):
         '''get reference to our sqllite _database - performs basic integrity check'''
-        addon = xbmcaddon.Addon(ADDON_ID)
+        addon = xbmcaddon.Addon(ADDONID)
         dbpath = addon.getAddonInfo('profile')
         dbfile = xbmc.translatePath("%s/simplecache.db" % dbpath).decode('utf-8')
         if not xbmcvfs.exists(dbpath):

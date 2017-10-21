@@ -21,17 +21,51 @@
 '''
 import xbmc
 import xbmcaddon
+import json
+from clouddrive.common.utils import Utils
 
-class UIUtils:
+class KodiUtils:
     
     @staticmethod
-    def get_addon(addon_id=None):
-        if addon_id:
-            return xbmcaddon.Addon(addon_id)
+    def get_addon(addonid=None):
+        if addonid:
+            return xbmcaddon.Addon(addonid)
         else:
             return xbmcaddon.Addon()
     
     @staticmethod
-    def get_addon_monitor():
+    def get_system_monitor():
         return xbmc.Monitor()
     
+    @staticmethod
+    def execute_json_rpc(method, params=None, request_id=1):
+        cmd = {'jsonrpc': '2.0', 'method': method, 'id': request_id}
+        if params:
+            cmd['params'] = params
+        return json.loads(xbmc.executeJSONRPC(json.dumps(cmd)))
+    
+    @staticmethod
+    def is_addon_enabled(addonid):
+        response = KodiUtils.execute_json_rpc('Addons.GetAddonDetails', {'addonid': addonid})
+        return response["result"]["addon"]["enabled"]
+
+    @staticmethod
+    def get_addon_setting(setting_id, addonid=None):
+        addon = KodiUtils.get_addon(addonid)
+        setting = addon.getSetting(setting_id)
+        del addon
+        return setting
+    
+    @staticmethod
+    def set_addon_setting(setting_id, value, addonid=None):
+        addon = KodiUtils.get_addon(addonid)
+        setting = addon.setSetting(setting_id, Utils.str(value))
+        del addon
+        return setting
+    
+    @staticmethod
+    def get_addon_info(info_id, addonid=None):
+        addon = KodiUtils.get_addon(addonid)
+        info = addon.getAddonInfo(info_id)
+        del addon
+        return info

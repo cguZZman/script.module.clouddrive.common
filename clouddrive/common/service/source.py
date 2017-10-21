@@ -20,17 +20,16 @@
     @author: Carlos Guzman (cguZZman) carlosguzmang@hotmail.com
 '''
 
-import BaseHTTPServer
-import threading
 import urllib
 
 from clouddrive.common.account import AccountManager
-from clouddrive.common.html import HTML
+from clouddrive.common.html import XHTML
 from clouddrive.common.service.base import BaseService, BaseHandler
+from clouddrive.common.service.messaging import MessagingServiceUtil
+from clouddrive.common.ui.logger import Logger
+from clouddrive.common.ui.utils import KodiUtils
 from clouddrive.common.utils import Utils
-import xbmc
-import xbmcaddon
-import xbmcgui
+
 
 
 class SourceService(BaseService):
@@ -40,73 +39,45 @@ class SourceService(BaseService):
         self._handler = Source
     
     def get_port(self):
-        return int(self._addon.getSetting('port_directory_listing'))
+        return int(KodiUtils.get_addon_setting('port_directory_listing'))
     
     def start(self):
-        if self._addon.getSetting('allow_directory_listing') == 'true':
+        if KodiUtils.get_addon_setting('allow_directory_listing') == 'true':
             super(SourceService, self).start()
     
 class Source(BaseHandler):
 
-    html_header = '<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2 Final//EN">'
-    content_type = 'text/html;charset=UTF-8'
+    content_type = 'text/html; charset=UTF-8'
+    account_manager = None
     kilobyte = 1024.0
     megabyte = kilobyte*kilobyte
     gigabyte = megabyte*kilobyte
-
-    addon = xbmcaddon.Addon()
-    addonname = addon.getAddonInfo('name')
-    account_manager = None
     
     def open_table(self, title):
-        html = HTML()
+        title = urllib.unquote(title)
+        html = XHTML('html')
         html.head.title(title)
         body = html.body
         body.h1(title)
         table = body.table()
         row = table.tr
-        row.th(valign='top')
         row.th.a('Name', href='?C=N;O=D')
         row.th.a('Last modified', href='?C=M;O=A')
         row.th.a('Size', href='?C=S;O=A')
         row.th.a('Description', href='?C=D;O=A')
-        th = table.tr.th(colspan='5')
-        th.hr()
+        row = table.tr
+        row.th(colspan='5').hr()
         return html, table
     
+    def add_row(self, table, file_name, date='  - ', size='  - ', description='&nbsp;'):
+        row = table.tr
+        row.td(valign='top').a(file_name, href=urllib.quote(file_name))
+        row.td(date, align='right')
+        row.td(size, align='right')
+        row.td(description, escape=False)
+    
     def close_table(self, table):
-        th = table.tr.th(colspan='5')
-        th.hr()
-    
-    def show_no_account(self):
-        xbmcgui.Dialog().ok(self.addonname, self.addon.getLocalizedString(32070), self.addon.getLocalizedString(32071))
-    
-    def get_accounts(self):
-        self.send_response(200)
-        self.send_header('Content-type', self.content_type)
-        self.end_headers()
-        if self.command == 'GET':
-            self.wfile.write(self.html_header)
-            account_manager = AccountManager()
-            account_manager.reload()
-            accounts = account_manager.map()
-            html, table = self.open_table('Index of /')
-            for driveid in accounts:
-                onedrive = accounts[driveid]
-                row = table.tr
-                row.th(valign='top')
-                folder = onedrive.name + '/'
-                row.td.a(folder, href=urllib.quote(folder))
-                row.td('  - ', align='right')
-                row.td('  - ', align='right')
-                row.td('&nbsp;', escape=False)
-            self.close_table(table)
-            self.wfile.write(html)
-            self.wfile.close()
-            if len(accounts) == 0:
-                t = threading.Thread(target=self.show_no_account)
-                t.setDaemon(True)
-                t.start()
+        table.tr.th(colspan='5').hr()
     
     def get_size(self, size):
         unit = ''
@@ -122,72 +93,138 @@ class Source(BaseHandler):
         elif size < 0:
             return '-'
         return ("%.2f" % size) + unit
-            
-    def process_files(self, onedrive, table, files):
-        for f in files['value']:
-            file_name = Utils.str(Utils.get_safe_value(f, 'name', 'No name found: ' + f['id']))
-            if 'folder' in f:
-                file_name += '/'
-            xbmc.log(file_name, xbmc.LOGDEBUG)
-            xbmc.log(urllib.quote(file_name), xbmc.LOGDEBUG)
-            row = table.tr
-            row.th(valign='top')
-            row.td.a(file_name, href=urllib.quote(file_name))
-            date = Utils.get_safe_value(f, 'lastModifiedDateTime', '  - ')
-            size = self.get_size(Utils.get_safe_value(f, 'size', -1))
-            description = Utils.get_safe_value(f, 'description', '&nbsp;')
-            row.td(date, align='right')
-            row.td(size, align='right')
-            row.td(description, escape=False)
-        
-        if '@odata.nextLink' in files:
-            next_list = onedrive.get(files['@odata.nextLink'], raw_url=True)
-            self.process_files(onedrive, table, next_list)
     
-    def list_dir(self, onedrive, path):
-        self.send_response(200)
+    def begin_response(self, code):
+        self.send_response(code)
         self.send_header('Content-type', self.content_type)
+        
         self.end_headers()
+    
+    def get_cloud_drive_addons(self):
+        addons = []
+        addonid = KodiUtils.get_addon_info('id')
+        response = KodiUtils.execute_json_rpc('Addons.GetAddons', {'type':'xbmc.python.pluginsource', 'enabled': True, 'properties': ['dependencies', 'name']})
+        for addon in Utils.get_safe_value(Utils.get_safe_value(response, 'result', {}), 'addons', []):
+            for dependency in addon['dependencies']:
+                if dependency['addonid'] == addonid:
+                    addons.append(addon)
+                    break
+        return addons
+        
+    def show_addon_list(self):
+        self.begin_response(200)
         if self.command == 'GET':
-            self.wfile.write(self.html_header)
-            html, table = self.open_table('Index of '+ onedrive.name + path)
-            path = path[:len(path)-1]
-            if path: path = ':' + path + ':'
-            files = onedrive.get('/drives/'+onedrive.driveid+'/root'+path+'/children')
-            self.process_files(onedrive, table, files)
+            html, table = self.open_table('Index of /')
+            for addon in self.get_cloud_drive_addons():
+                self.add_row(table, addon['name'] + '/')
             self.close_table(table)
             self.wfile.write(html)
             self.wfile.close()
     
-    def download(self, onedrive, path):
-        self.send_response(303)
-        if self.command == 'GET':
-            f = onedrive.get('/drives/'+onedrive.driveid+'/root:'+path)
-            self.send_header('Location', f['@microsoft.graph.downloadUrl'])
-        self.end_headers()
+    def get_drive_list(self, addonid):
+        drives = []
+        accounts = MessagingServiceUtil.execute_remote_method(addonid, 'get_accounts')
+        for account_id in accounts:
+            account = accounts[account_id]
+            for drive in account['drives']:
+                drives.append(drive)
+        return drives
     
+    def get_addonid(self, addon_name):
+        addons = self.get_cloud_drive_addons()
+        addonid = None
+        for addon in addons:
+            if addon['name'] == addon_name:
+                addonid = addon['addonid']
+                break
+        return addonid
+    
+    def get_driveid(self, addonid, drive_name):
+        driveid = None
+        drives = self.get_drive_list(addonid)
+        drive_name = urllib.unquote(drive_name)
+        for drive in drives:
+            if drive['display_name'] == drive_name:
+                driveid = drive['id']
+                break
+        return driveid
+                
+    
+    def show_drives(self, addon_name):
+        addonid = self.get_addonid(addon_name)
+        if addonid:
+            self.begin_response(200)
+            if self.command == 'GET':
+                html, table = self.open_table('Index of /'+addon_name+'/')
+                self.add_row(table, '../')
+                drives = self.get_drive_list(addonid)
+                for drive in drives:
+                    self.add_row(table, drive['display_name'] + '/')
+                self.close_table(table)
+                self.wfile.write(html)
+                self.wfile.close()
+        else:
+            self.begin_response(404)
+    
+    def process_path(self, addon_name, drive_name, path):
+        addonid = self.get_addonid(addon_name)
+        if addonid:
+            driveid = self.get_driveid(addonid, drive_name)
+            if driveid:
+                parts = self.path.split('/')
+                fn = self.download if parts[len(parts)-1] else self.show_folder
+                fn(addonid, driveid, path)
+            else:
+                self.begin_response(404)
+        else:
+            self.begin_response(404)
+
+    def show_folder(self, addonid, driveid, path):
+        path_len = len(path)
+        if path_len > 1:
+            path = path[:path_len-1]
+        items = MessagingServiceUtil.execute_remote_method(addonid, 'get_folder_items', kwargs={'driveid': driveid, 'path': path})
+        if items:
+            self.begin_response(200)
+            if self.command == 'GET':
+                html, table = self.open_table('Index of ' + self.path)
+                self.add_row(table, '../')
+                for item in items:
+                    file_name = Utils.str(item['name'])
+                    if 'folder' in item:
+                        file_name += '/'
+                    date = Utils.default(Utils.get_safe_value(item, 'last_modified_date'), '  - ')
+                    size = self.get_size(Utils.default(Utils.get_safe_value(item, 'size'), -1))
+                    description = Utils.default(Utils.get_safe_value(item, 'description'), '&nbsp;')
+                    self.add_row(table, file_name, date, size, description)
+                self.close_table(table)
+                self.wfile.write(html)
+                self.wfile.close()
+        else:
+            self.begin_response(404)
+    
+    def download(self, addonid, driveid, path):
+        item = MessagingServiceUtil.execute_remote_method(addonid, 'get_item', kwargs={'driveid': driveid, 'path': path, 'include_download_info': True})
+        if item:
+            self.send_response(303)
+            if self.command == 'GET':
+                self.send_header('location', item['download_info']['url'])
+            self.end_headers()
+        else:
+            self.begin_response(404)
+        
     def do_GET(self):
         parts = self.path.split('/')
-        account = parts[1]
-        xbmc.log('method is: ' + self.command, xbmc.LOGDEBUG)
-        xbmc.log('parts: ' + Utils.str(parts), xbmc.LOGDEBUG)
-        if account:
-            account = urllib.unquote(account)
-            accounts = AccountManager().map()
-            onedrive = None
-            for driveid in accounts:
-                if accounts[driveid].name == account:
-                    onedrive = accounts[driveid]
-                    break
-            if onedrive:
-                index = self.path.find('/', len(account))
-                drive_path = self.path[index:]
-                xbmc.log('drive_path: ' + Utils.str(drive_path), xbmc.LOGDEBUG)
-                if parts[len(parts) - 1]:
-                    self.download(onedrive, drive_path)
-                else:
-                    self.list_dir(onedrive, drive_path)
+        addon_name = parts[1]
+        if addon_name:
+            Logger.debug('parts: ' + Utils.str(parts))
+            size = len(parts)
+            if size == 2 or (size == 3 and not parts[2]):
+                self.show_drives(addon_name)
+            else:
+                drive_name = parts[2]
+                path = self.path[len(addon_name)+len(drive_name)+2:]
+                self.process_path(addon_name, drive_name, path)
         else:
-            self.get_accounts();
-            
-            
+            self.show_addon_list()
+        

@@ -20,19 +20,17 @@
     @author: Carlos Guzman (cguZZman) carlosguzmang@hotmail.com
 '''
 from BaseHTTPServer import BaseHTTPRequestHandler
-from SocketServer import TCPServer
+from SocketServer import ThreadingTCPServer
 import SocketServer
 import socket
 from threading import Thread
 
 from clouddrive.common.ui.logger import Logger
-from clouddrive.common.ui.utils import UIUtils
+from clouddrive.common.ui.utils import KodiUtils
 
 
 class BaseService(object):
     _interface = '127.0.0.1'
-    _addon = None
-    _addon_name = None
     _server = None
     _thread = None
     _service_name = ''
@@ -41,8 +39,6 @@ class BaseService(object):
     
     def __init__(self, data=None):
         SocketServer.TCPServer.allow_reuse_address = True
-        self._addon = UIUtils.get_addon()
-        self._addon_name = self._addon.getAddonInfo('name')
         self.data = data
     
     def get_port(self):
@@ -54,43 +50,39 @@ class BaseService(object):
     
     def start(self):
         port = self.get_port()
-        setting_name = self._service_name + '.service.port'
-        self._addon.setSetting(setting_name, str(port))
-        Logger.notice('%s = %s' % (setting_name, port))
+        KodiUtils.set_addon_setting(self._service_name + '.service.port', str(port))
         self._server = BaseServer((self._interface, port), self._handler, self, self.data)
         self._server.server_activate()
         self._server.timeout = 1
         self._thread = Thread(target=self._server.serve_forever)
         self._thread.daemon = True
         self._thread.start()
-        Logger.notice('Service [%s] Started' % self._service_name)
+        Logger.notice('Service [%s] started in port %s' % (self._service_name, port))
     
     def stop(self):
         if self._server:
             self._server.shutdown()
             self._server.server_close()
-            self._server.socket.close()
-            #self._server.shutdown()
-            Logger.notice('Service [%s] Stopped' % self._service_name)
+            Logger.notice('Service [%s] stopped' % self._service_name)
     
     @staticmethod
     def run(services):
         for service in services:
             service.start()
-        monitor = UIUtils.get_addon_monitor()
+        monitor = KodiUtils.get_system_monitor()
         while not monitor.abortRequested():
             if monitor.waitForAbort(1):
                 break
         for service in services:
             service.stop()
 
-class BaseServer(TCPServer):
+class BaseServer(ThreadingTCPServer):
     data = None
     service = None
     def __init__(self, server_address, RequestHandlerClass, service, data=None):
         self.data = data
         self.service = service
-        SocketServer.TCPServer.__init__(self, server_address, RequestHandlerClass)
+        ThreadingTCPServer.__init__(self, server_address, RequestHandlerClass)
         
 class BaseHandler(BaseHTTPRequestHandler):
     def log_message(self, format, *args):

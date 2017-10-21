@@ -33,7 +33,6 @@ from clouddrive.common.account import AccountManager, AccountNotFoundException, 
 from clouddrive.common.exception import UIException, ExceptionUtils, RequestException
 from clouddrive.common.remote.errorreport import ErrorReport
 from clouddrive.common.remote.signin import Signin
-from clouddrive.common.service.download import DownloadServiceUtil
 from clouddrive.common.service.messaging import CloudDriveMessagingListerner
 from clouddrive.common.ui.dialog import DialogProgress, DialogProgressBG
 from clouddrive.common.ui.logger import Logger
@@ -43,13 +42,14 @@ import xbmcaddon
 import xbmcgui
 import xbmcplugin
 import xbmcvfs
+from clouddrive.common.service.download import DownloadServiceUtil
 
 
 class CloudDriveAddon(CloudDriveMessagingListerner):
     _DEFAULT_SIGNIN_TIMEOUT = 120
     _addon = None
     _addon_handle = None
-    _addon_id = None
+    _addonid = None
     _addon_name = None
     _addon_params = None
     _addon_url = None
@@ -77,7 +77,7 @@ class CloudDriveAddon(CloudDriveMessagingListerner):
     
     def __init__(self):
         self._addon = xbmcaddon.Addon()
-        self._addon_id = self._addon.getAddonInfo('id')
+        self._addonid = self._addon.getAddonInfo('id')
         self._addon_name = self._addon.getAddonInfo('name')
         self._addon_url = sys.argv[0]
         self._addon_version = self._addon.getAddonInfo('version')
@@ -112,13 +112,13 @@ class CloudDriveAddon(CloudDriveMessagingListerner):
     def get_my_files_menu_name(self):
         return self._common_addon.getLocalizedString(32052)
     
-    def get_custom_drive_folders(self, driveid=None):
+    def get_custom_drive_folders(self, driveid):
         return
     
-    def get_folder_items(self, driveid=None, item_driveid=None, item_id=None, folder=None, on_items_page_completed=None):
+    def get_folder_items(self, driveid, item_driveid=None, item_id=None, path=None, on_items_page_completed=None):
         raise NotImplementedError()
     
-    def search(self, query, driveid=None, item_driveid=None, item_id=None, before_pagination=None):
+    def search(self, query, driveid, item_driveid=None, item_id=None, before_pagination=None):
         raise NotImplementedError()
     
     def cancel_operation(self):
@@ -131,9 +131,17 @@ class CloudDriveAddon(CloudDriveMessagingListerner):
         if 'name' in drive and drive['name']:
             display += ' | ' + drive['name']
         return display
-                    
+    
     def get_accounts(self):
         accounts = self._account_manager.load()
+        for account_id in accounts:
+            account = accounts[account_id]
+            for drive in account['drives']:
+                drive['display_name'] = self._get_display_name(account, drive)
+        return accounts
+                    
+    def list_accounts(self):
+        accounts = self.get_accounts()
         listing = []
         for account_id in accounts:
             account = accounts[account_id]
@@ -149,7 +157,7 @@ class CloudDriveAddon(CloudDriveMessagingListerner):
                     params['action'] = '_remove_drive'
                     cmd =  'RunPlugin('+self._addon_url + '?' + urllib.urlencode(params)+')'
                     context_options.append((self._common_addon.getLocalizedString(32007), cmd))
-                list_item = xbmcgui.ListItem(self._get_display_name(account, drive))
+                list_item = xbmcgui.ListItem(drive['display_name'])
                 list_item.addContextMenuItems(context_options)
                 params = {'action':'_list_drive', 'content_type': self._content_type, 'driveid': drive['id']}
                 url = self._addon_url + '?' + urllib.urlencode(params)
@@ -230,7 +238,7 @@ class CloudDriveAddon(CloudDriveMessagingListerner):
         self._progress_dialog.close()
         xbmc.executebuiltin('Container.Refresh')
     
-    def _remove_drive(self, driveid=None, **kwargs):
+    def _remove_drive(self, driveid, **kwargs):
         self._account_manager.load()
         account = self._account_manager.get_account_by_driveid(driveid)
         drive = self._account_manager.get_drive_by_driveid(driveid)
@@ -238,23 +246,23 @@ class CloudDriveAddon(CloudDriveMessagingListerner):
             self._account_manager.remove_drive(driveid)
         xbmc.executebuiltin('Container.Refresh')
     
-    def _remove_account(self, driveid=None, **kwargs):
+    def _remove_account(self, driveid, **kwargs):
         self._account_manager.load()
         account = self._account_manager.get_account_by_driveid(driveid)
         if self._dialog.yesno(self._addon_name, self._common_addon.getLocalizedString(32022) % account['name'], None):
             self._account_manager.remove_account(account['id'])
         xbmc.executebuiltin('Container.Refresh')
         
-    def _list_drive(self, driveid=None, **kwargs):
+    def _list_drive(self, driveid, **kwargs):
         drive_folders = self.get_custom_drive_folders(driveid)
         if self.cancel_operation():
             return
         if drive_folders:
             listing = []
-            url = self._addon_url + '?' + urllib.urlencode({'action':'_list_folder', 'folder': 'root', 'content_type': self._content_type, 'driveid': driveid})
+            url = self._addon_url + '?' + urllib.urlencode({'action':'_list_folder', 'path': '/', 'content_type': self._content_type, 'driveid': driveid})
             listing.append((url, xbmcgui.ListItem(self.get_my_files_menu_name()), True))
             for folder in drive_folders:
-                params = {'action':'_list_folder', 'folder': folder['folder'], 'content_type': self._content_type, 'driveid': driveid}
+                params = {'action':'_list_folder', 'path': folder['path'], 'content_type': self._content_type, 'driveid': driveid}
                 if 'params' in folder:
                     params.update(folder['params'])
                 url = self._addon_url + '?' + urllib.urlencode(params)
@@ -265,7 +273,7 @@ class CloudDriveAddon(CloudDriveMessagingListerner):
             xbmcplugin.addDirectoryItems(self._addon_handle, listing, len(listing))
             xbmcplugin.endOfDirectory(self._addon_handle, True)
         else:
-            self._list_folder(driveid=driveid, folder='root')
+            self._list_folder(driveid, path='/')
 
     def on_items_page_completed(self, items):
         self._load_count += len(items)
@@ -275,17 +283,17 @@ class CloudDriveAddon(CloudDriveMessagingListerner):
         else:
             self._progress_dialog_bg.update(100, self._addon_name, self._common_addon.getLocalizedString(32048) % Utils.str(self._load_count))
             
-    def _list_folder(self, driveid=None, item_driveid=None, item_id=None, folder=None, **kwargs):
-        item = self.get_item(driveid, item_driveid, item_id, folder)
+    def _list_folder(self, driveid, item_driveid=None, item_id=None, path=None, **kwargs):
+        item = self.get_item(driveid, item_driveid, item_id, path)
         if item:
             self._load_target = item['folder']['child_count']
             self._progress_dialog_bg.create(self._addon_name, self._common_addon.getLocalizedString(32049) % Utils.str(self._load_target))
-        items = self.get_folder_items(driveid, item_driveid, item_id, folder, on_items_page_completed = self.on_items_page_completed)
+        items = self.get_folder_items(driveid, item_driveid, item_id, path, on_items_page_completed = self.on_items_page_completed)
         if self.cancel_operation():
             return
         self._process_items(items, driveid)
         
-    def _process_items(self, items, driveid=None):
+    def _process_items(self, items, driveid):
         listing = []
         for item in items:
             item_id = item['id']
@@ -322,7 +330,7 @@ class CloudDriveAddon(CloudDriveMessagingListerner):
                     list_item.setIconImage(item['thumbnail'])
                     list_item.setThumbnailImage(item['thumbnail'])
             elif 'image' in item and self._content_type == 'image' and item_name_extension != 'mp4':
-                url = DownloadServiceUtil.get_download_url(self._addon, driveid, item_driveid, item_id, urllib.quote(item_name))
+                url = DownloadServiceUtil.build_download_url(self._addonid, driveid, item_driveid, item_id, urllib.quote(item_name))
                 list_item.setInfo('pictures', item['image'])
                 if 'thumbnail' in item:
                     list_item.setIconImage(item['thumbnail'])
@@ -333,7 +341,7 @@ class CloudDriveAddon(CloudDriveMessagingListerner):
         xbmcplugin.addDirectoryItems(self._addon_handle, listing, len(listing))
         xbmcplugin.endOfDirectory(self._addon_handle, True)
     
-    def _search(self, driveid=None, item_driveid=None, item_id=None, **kwargs):
+    def _search(self, driveid, item_driveid=None, item_id=None, **kwargs):
         query = self._dialog.input(self._addon_name + ' - ' + self._common_addon.getLocalizedString(32042))
         Logger.notice('query = ' + query)
         if query:
@@ -344,8 +352,8 @@ class CloudDriveAddon(CloudDriveMessagingListerner):
                 return
             self._process_items(items, driveid)
     
-    def _slideshow(self, driveid=None, item_driveid=None, item_id=None, folder=None, old_child_count=0, **kwargs):
-        item = self.get_item(driveid, item_driveid, item_id, folder)
+    def _slideshow(self, driveid, item_driveid=None, item_id=None, path=None, old_child_count=0, **kwargs):
+        item = self.get_item(driveid, item_driveid, item_id, path)
         if self.cancel_operation():
             return
         if item:
@@ -355,20 +363,20 @@ class CloudDriveAddon(CloudDriveMessagingListerner):
                 if child_count >= 0:
                     Logger.debug('Slideshow child count changed. Refreshing slideshow...')
                 params = {'action':'_list_folder', 'content_type': self._content_type,
-                          'item_driveid': Utils.default(item_driveid, ''), 'item_id': Utils.default(item_id, ''), 'driveid': Utils.default(driveid, ''), 'folder' : Utils.default(folder, ''),
+                          'item_driveid': Utils.default(item_driveid, ''), 'item_id': Utils.default(item_id, ''), 'driveid': driveid, 'path' : Utils.default(path, ''),
                           'child_count': child_count}
                 extra_params = ',recursive' if self._addon.getSetting('slideshow_recursive') == 'true' else ''
                 xbmc.executebuiltin('SlideShow('+self._addon_url + '?' + urllib.urlencode(params) + extra_params + ')')
                 wait_for_slideshow = True
             else:
                 Logger.debug('Slideshow child count is the same, nothing to refresh...')
-            t = threading.Thread(target=self._refresh_slideshow, args=(driveid, item_driveid, item_id, folder, child_count, wait_for_slideshow,))
+            t = threading.Thread(target=self._refresh_slideshow, args=(driveid, item_driveid, item_id, path, child_count, wait_for_slideshow,))
             t.setDaemon(True)
             t.start()
     
-    def _refresh_slideshow(self, driveid, item_driveid, item_id, folder, child_count, wait_for_slideshow):
+    def _refresh_slideshow(self, driveid, item_driveid, item_id, path, child_count, wait_for_slideshow):
         if wait_for_slideshow:
-            Logger.debug('Waiting up to 10 minutes until the slideshow for folder %s starts...' % Utils.default(item_id, folder))
+            Logger.debug('Waiting up to 10 minutes until the slideshow for folder %s starts...' % Utils.default(item_id, path))
             current_time = time.time()
             max_waiting_time = current_time + 10 * 60
             while not self.cancel_operation() and not xbmc.getCondVisibility('Slideshow.IsActive') and max_waiting_time > current_time:
@@ -377,7 +385,7 @@ class CloudDriveAddon(CloudDriveMessagingListerner):
                 current_time = time.time()
             self._print_slideshow_info()
         interval = self._addon.getSetting('slideshow_refresh_interval')
-        Logger.debug('Waiting up to %s minute(s) to check if it is needed to refresh the slideshow of folder %s...' % (interval, Utils.default(item_id, folder)))
+        Logger.debug('Waiting up to %s minute(s) to check if it is needed to refresh the slideshow of folder %s...' % (interval, Utils.default(item_id, path)))
         current_time = time.time()
         target_time = current_time + int(interval) * 60
         while not self.cancel_operation() and target_time > current_time and xbmc.getCondVisibility('Slideshow.IsActive'):
@@ -387,11 +395,11 @@ class CloudDriveAddon(CloudDriveMessagingListerner):
         self._print_slideshow_info()
         if not self.cancel_operation() and xbmc.getCondVisibility('Slideshow.IsActive'):
             try:
-                self._slideshow(driveid, item_driveid, item_id, folder, child_count)
+                self._slideshow(driveid, item_driveid, item_id, path, child_count)
             except Exception as e:
                 Logger.error('Slideshow failed to auto refresh. Will be restarted when possible. Error: ')
                 Logger.error(ExceptionUtils.full_stacktrace(e))
-                self._refresh_slideshow(driveid, item_driveid, item_id, folder, -1, wait_for_slideshow)
+                self._refresh_slideshow(driveid, item_driveid, item_id, path, -1, wait_for_slideshow)
         else:
             Logger.notice('Slideshow is not running anymore or abort requested.')
         
@@ -401,8 +409,8 @@ class CloudDriveAddon(CloudDriveMessagingListerner):
         elif self.cancel_operation():
             Logger.debug('Abort requested...')
         
-    def _export_folder(self, driveid=None, item_driveid=None, item_id=None, **kwargs):
-        if self._home_window.getProperty(self._addon_id + 'exporting'):
+    def _export_folder(self, driveid, item_driveid=None, item_id=None, **kwargs):
+        if self._home_window.getProperty(self._addonid + 'exporting'):
             self._dialog.ok(self._addon_name, self._common_addon.getLocalizedString(32059) + ' ' + self._common_addon.getLocalizedString(32038))
         else:
             string_id = 32002 if self._content_type == 'audio' else 32001
@@ -422,7 +430,7 @@ class CloudDriveAddon(CloudDriveMessagingListerner):
                 folder_path = export_folder + folder_name + '/'
                 if self._addon.getSetting('clean_folder') != 'true' or not xbmcvfs.exists(folder_path) or xbmcvfs.rmdir(folder_path, True):
                     self._exporting = True
-                    self._home_window.setProperty(self._addon_id + 'exporting', 'true')
+                    self._home_window.setProperty(self._addonid + 'exporting', 'true')
                     self.__export_folder(driveid, item, export_folder)
                 else:
                     self._dialog.ok(self._addon_name, self._common_addon.getLocalizedString(32066) % folder_path)
@@ -469,7 +477,7 @@ class CloudDriveAddon(CloudDriveMessagingListerner):
                 self._exporting_percent = p
             self._export_progress_dialog_bg.update(self._exporting_percent, self._addon_name + ' ' + self._common_addon.getLocalizedString(32024), file_path[len(base_export_folder):])        
     
-    def play(self, driveid=None, item_driveid=None, item_id=None, **kwargs):
+    def play(self, driveid, item_driveid=None, item_id=None, **kwargs):
         find_subtitles = self._addon.getSetting('set_subtitle') == 'true' and self._content_type == 'video'
         item = self.get_item(driveid, item_driveid, item_id, find_subtitles=find_subtitles)
         file_name = Utils.unicode(item['name'])
@@ -479,12 +487,12 @@ class CloudDriveAddon(CloudDriveMessagingListerner):
         elif 'video' in item:
             list_item.addStreamInfo('video', item['video'])
         list_item.select(True)
-        list_item.setPath(DownloadServiceUtil.get_download_url(self._addon, driveid, item_driveid, item_id, urllib.quote(file_name)))
+        list_item.setPath(DownloadServiceUtil.build_download_url(self._addonid, driveid, item_driveid, item_id, urllib.quote(file_name)))
         list_item.setProperty('mimetype', Utils.get_safe_value(item, 'mimetype'))
         if find_subtitles and 'subtitles' in item:
             subtitles = []
             for subtitle in item['subtitles']:
-                subtitles.append(DownloadServiceUtil.get_download_url(self._addon, driveid, Utils.default(Utils.get_safe_value(subtitle, 'drive_id'), driveid), subtitle['id'], urllib.quote(subtitle['name'])))
+                subtitles.append(DownloadServiceUtil.build_download_url(self._addonid, driveid, Utils.default(Utils.get_safe_value(subtitle, 'drive_id'), driveid), subtitle['id'], urllib.quote(subtitle['name'])))
             list_item.setSubtitles(subtitles)
         xbmcplugin.setResolvedUrl(self._addon_handle, True, list_item)
     
@@ -537,7 +545,7 @@ class CloudDriveAddon(CloudDriveMessagingListerner):
                 else:
                     line1 = self._common_addon.getLocalizedString(32036)
                     line3 = self._common_addon.getLocalizedString(32038)
-        report = '[%s] [%s]\n\n%s\n%s\n%s\n\n%s' % (self._addon_id, self._addon_version, line1, line2, line3, stacktrace)
+        report = '[%s] [%s]\n\n%s\n%s\n%s\n\n%s' % (self._addonid, self._addon_version, line1, line2, line3, stacktrace)
         if rex:
             report += '\n\n%s\nResponse:\n%s' % (rex.request, rex.response)
         report += '\n\nshow_error_dialog: %s' % show_error_dialog
@@ -561,7 +569,7 @@ class CloudDriveAddon(CloudDriveMessagingListerner):
             if self._addon_params and 'action' in self._addon_params:
                 getattr(self, self._addon_params['action'])(**self._addon_params);
             else:
-                self.get_accounts()
+                self.list_accounts()
         except Exception as ex:
             self._handle_exception(ex)
         finally:
@@ -569,6 +577,6 @@ class CloudDriveAddon(CloudDriveMessagingListerner):
             self._progress_dialog_bg.close()
             self._export_progress_dialog_bg.close()
             if self._exporting:
-                self._home_window.clearProperty(self._addon_id + 'exporting')
+                self._home_window.clearProperty(self._addonid + 'exporting')
 
 
