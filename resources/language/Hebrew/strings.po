@@ -91,11 +91,11 @@ msgstr "אין אפשרות להוסיף את החשבון:"
 
 msgctxt "#32022"
 msgid "Account '%s' will be removed. Are you sure?"
-msgstr "החשבון '% s' יוסר. האם אתה בטוח?"
+msgstr "החשבון '%s' יוסר. האם אתה בטוח?"
 
 msgctxt "#32023"
 msgid "Drive '%s' will be removed. Are you sure?"
-msgstr "הכונן '% s' יוסר. האם אתה בטוח?"
+msgstr "הכונן '%s' יוסר. האם אתה בטוח?"
 
 msgctxt "#32024"
 msgid "exporting"
@@ -115,7 +115,7 @@ msgstr "שגיאה לא ידועה:"
 
 msgctxt "#32028"
 msgid "Unable to move your previous accounts information file. Please move it manually to %s or add your accounts again."
-msgstr "לא ניתן להעביר את קובץ פרטי החשבונות הקודמים שלך. העבר אותו ידנית ל-% s או הוסף שוב את החשבונות שלך."
+msgstr "לא ניתן להעביר את קובץ פרטי החשבונות הקודמים שלך. העבר אותו ידנית ל-%s או הוסף שוב את החשבונות שלך."
 
 msgctxt "#32029"
 msgid "Need help? Go to the forum and post a message in: kodi.daro.mx/forum"
@@ -167,7 +167,7 @@ msgstr "הזן טקסט לחיפוש:"
 
 msgctxt "#32043"
 msgid "Something happened with the request%s."
-msgstr "קרה משהו עם הבקשה % s."
+msgstr "קרה משהו עם הבקשה %s."
 
 msgctxt "#32044"
 msgid "Will try in %s seconds."
@@ -179,7 +179,7 @@ msgstr "ניסיון %s מתוך %s."
 
 msgctxt "#32046"
 msgid "The credentials for '%s' are no longer valid. You need to sign in again.%sDo you want to start the process?"
-msgstr "האישורים עבור '% s' אינם תקפים עוד. עליך להיכנס שוב. %s האם ברצונך להתחיל את התהליך?"
+msgstr "האישורים עבור '%s' אינם תקפים עוד. עליך להיכנס שוב. %s האם ברצונך להתחיל את התהליך?"
 
 msgctxt "#32047"
 msgid "%s of %s items loaded, please wait..."
