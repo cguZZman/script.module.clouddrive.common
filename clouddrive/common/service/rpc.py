@@ -1,0 +1,85 @@
+'''
+    OneDrive for Kodi
+    Copyright (C) 2015 - Carlos Guzman
+
+    This program is free software; you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation; either version 2 of the License, or
+    (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License along
+    with this program; if not, write to the Free Software Foundation, Inc.,
+    51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+
+    Created on Mar 1, 2015
+    @author: Carlos Guzman (cguZZman) carlosguzmang@hotmail.com
+'''
+
+import time
+import uuid
+
+from clouddrive.common.ui.utils import KodiUtils
+
+
+class RemoteProcessCallable(object):
+    def on_execute_method(self, exec_id, method, args='[]', kwargs='{}'):
+        home_window = KodiUtils.get_window(10000)
+        key = '%s-%s' % (self._addonid, exec_id)
+        status_key = '%s.status' % key
+        result_key = '%s.result' % key
+        try:
+            home_window.setProperty(status_key, 'in-progress')
+            args = eval(args)
+            kwargs = eval(kwargs)
+            home_window.setProperty(result_key, repr(getattr(self, method)(*args, **kwargs)))
+            home_window.setProperty(status_key, 'success')
+        except Exception as e:
+            home_window.setProperty(result_key, repr(e))
+            home_window.setProperty(status_key, 'fail')
+            raise e
+        
+class RpcUtil(object):
+    @staticmethod
+    def execute_remote_method(addonid, method, args=[], kwargs={}, exec_id=None):
+        if not exec_id:
+            exec_id = uuid.uuid4()
+        KodiUtils.run_plugin(addonid, {
+            'action' : 'on_execute_method',
+            'method' : method,
+            'exec_id' : exec_id,
+            'args' : repr(args),
+            'kwargs' : repr(kwargs)
+        })
+        key = '%s-%s' % (addonid, exec_id)
+        status_key = '%s.status' % key
+        home_window = KodiUtils.get_window(10000)
+        current_time = time.time()
+        target_time = current_time + 5
+        while target_time > current_time:
+            if home_window.getProperty(status_key):
+                break
+            current_time = time.time()
+        status = home_window.getProperty(status_key)
+        if status:
+            current_time = time.time()
+            target_time = current_time + 60
+            while status == 'in-progress' and target_time > current_time:
+                status = home_window.getProperty('%s.status' % key)
+                current_time = time.time()
+            if status != 'in-progress':
+                result = home_window.getProperty('%s.result' % key)
+                if status == 'success':
+                    return eval(result)
+                else:
+                    raise Exception(result)
+            else:
+                raise Exception('MethodExecution: Finish timeout')
+        else:
+            raise Exception('MethodExecution: Start timeout')       
+            
+        

@@ -61,10 +61,10 @@ class Source(BaseHandler):
         body.h1(title)
         table = body.table()
         row = table.tr
-        row.th.a('Name')
-        row.th.a('Last modified')
-        row.th.a('Size')
-        row.th.a('Description')
+        row.th.a('Name', href='?C=N;O=D')
+        row.th.a('Last modified', href='?C=M;O=A')
+        row.th.a('Size', href='?C=S;O=A')
+        row.th.a('Description', href='?C=D;O=A')
         row = table.tr
         row.th(colspan='4').hr()
         return html, table
@@ -165,12 +165,7 @@ class Source(BaseHandler):
                 parts = self.path.split('/')
                 if parts[len(parts)-1]:
                     response_code = 303
-                    if path:
-                        url = self.get_download_url(addonid, driveid, path)
-                    else:
-                        url = self.path + '/'
-                    headers['location'] = url
-                    response = None
+                    headers['location'] = self.get_download_url(addonid, driveid, path)
                 else:
                     response_code = 200
                     response = self.show_folder(addonid, driveid, path)
@@ -202,8 +197,6 @@ class Source(BaseHandler):
     
     def get_download_url(self, addonid, driveid, path):
         item = RpcUtil.execute_remote_method(addonid, 'get_item', kwargs={'driveid': driveid, 'path': path, 'include_download_info': True})
-        if 'folder' in item:
-            return self.path + '/'
         return item['download_info']['url']
         
     def do_GET(self):

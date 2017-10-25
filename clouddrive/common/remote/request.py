@@ -21,7 +21,6 @@
 '''
 
 import json
-import ssl
 import time
 import urllib2
 
@@ -29,12 +28,6 @@ from clouddrive.common.exception import RequestException
 from clouddrive.common.ui.logger import Logger
 from clouddrive.common.utils import Utils
 
-
-try:
-    if hasattr(ssl, '_create_unverified_context'):
-        ssl._create_default_https_context = ssl._create_unverified_context
-except:
-    pass
 
 class Request(object):
     _DEFAULT_RESPONSE = '{}'
@@ -61,7 +54,7 @@ class Request(object):
     response_info = None
     response_text = None
     
-    def __init__(self, url, data, headers, tries=3, delay=5, backoff=2, exceptions=None, before_request=None, on_exception=None, on_failure=None, on_success=None, on_complete=None, cancel_operation=None, waiting_retry=None, wait=None):
+    def __init__(self, url, data, headers=None, tries=3, delay=5, backoff=2, exceptions=None, before_request=None, on_exception=None, on_failure=None, on_success=None, on_complete=None, cancel_operation=None, waiting_retry=None, wait=None):
         self.url = url
         self.data = data
         self.headers = headers
@@ -88,6 +81,7 @@ class Request(object):
             self.wait = time.sleep
         if not self.headers:
             self.headers = {}
+        
         for i in xrange(self.tries):
             self.current_tries = i + 1
             if self.before_request:
@@ -97,24 +91,28 @@ class Request(object):
             request_report = 'Request URL: ' + Utils.str(self.url)
             request_report += '\nRequest data: ' + Utils.str(self.data)
             request_report += '\nRequest headers: ' + Utils.str(self.headers)
-            Logger.debug(request_report);
+            response_report = '<not_set>'
+            response = None
             try:
                 req = urllib2.Request(self.url, self.data, self.headers)
                 response = urllib2.urlopen(req)
-                self.response_text = response.read()
-                self.response_url = response.geturl()
                 self.response_code = response.getcode()
                 self.response_info = response.info()
+                self.response_url = response.geturl()
+                self.response_text = response.read()
+                content_length = self.response_info.getheader('content-length', -1)
+                response_report = '\nResponse Headers:\n%s' % Utils.str(self.response_info)
+                response_report += '\nResponse (%d) content-length=%s, len=<%s>:\n%s' % (self.response_code, content_length, len(self.response_text), self.response_text)
                 self.success = True
                 break
             except self.exceptions as e:
                 root_exception = e
-                Logger.debug('Request exception: ' + Utils.unicode(e))
-                response_report = ''
+                response_report = '\nResponse <Exception>: ' 
                 if isinstance(e, urllib2.HTTPError):
-                    response_report = e.read()
-                    Logger.debug('Request response: ' + Utils.unicode(e))
-                rex = RequestException(Utils.str(e), root_exception, request_report, Utils.str(response_report))
+                    response_report += Utils.str(e.read())
+                else:
+                    response_report += Utils.str(e)
+                rex = RequestException(Utils.str(e), root_exception, request_report, response_report)
                 if self.on_exception:
                     self.on_exception(self, rex)
                 if self.cancel_operation and self.cancel_operation():
@@ -135,11 +133,14 @@ class Request(object):
                     self.wait(1)
                     current_time = time.time()
                 self.current_delay *= self.backoff
+            finally:
+                Logger.debug(request_report + response_report);
+                if response:
+                    response.close()
         if self.success and self.on_success:
             self.on_success(self)
         if self.on_complete:
             self.on_complete(self)
-        Logger.debug('Response text: ' + Utils.str(self.response_text))
         return self.response_text
         
     def request_json(self):

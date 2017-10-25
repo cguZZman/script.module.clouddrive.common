@@ -22,8 +22,11 @@
 
 
 from clouddrive.common.service.base import BaseService, BaseHandler
-from clouddrive.common.service.messaging import MessagingServiceUtil
+from clouddrive.common.service.rpc import RpcUtil
 from clouddrive.common.ui.utils import KodiUtils
+from urllib2 import HTTPError
+from clouddrive.common.exception import ExceptionUtils
+from clouddrive.common.ui.logger import Logger
 
 
 class DownloadService(BaseService):
@@ -35,26 +38,36 @@ class DownloadService(BaseService):
 class Download(BaseHandler):
     def do_GET(self):
         data = self.path.split('/')
+        code = 307
+        headers = {}
+        content = None
         if len(data) > 3:
-            item = MessagingServiceUtil.execute_remote_method(data[1], 'get_item', kwargs = {
-                'driveid' : data[2],
-                'item_driveid' : data[3],
-                'item_id' : data[4],
-                'include_download_info' : True
-            })
-            if item:
-                self.send_response(307)
-                self.send_header('location', item['download_info']['url'])
-            else:
-                self.send_response(404)
+            try:
+                item = RpcUtil.execute_remote_method(data[1], 'get_item', kwargs = {
+                    'driveid' : data[2],
+                    'item_driveid' : data[3],
+                    'item_id' : data[4],
+                    'include_download_info' : True
+                })
+                headers['location'] = item['download_info']['url']
+            except Exception as e:
+                httpex = ExceptionUtils.extract_exception(e, HTTPError)
+                if httpex:
+                    code = httpex.code
+                else:
+                    code = 500
+                content = ExceptionUtils.full_stacktrace(e)
+                Logger.error('DownloadException:')
+                Logger.error(content)
         else:
-            self.send_response(400)
-        self.end_headers()
-        return
+            code = 400
+            content = 'Not enough parameters'
+        self.write_response(code, content=content, headers=headers)
+        
 
 class DownloadServiceUtil(object):
     @staticmethod
     def build_download_url(addonid, driveid, item_driveid, item_id, name):
-        return 'http://localhost:%s/%s/%s/%s/%s/%s' % (KodiUtils.get_addon_setting('download.service.port', 'script.module.clouddrive.common'), addonid, driveid, item_driveid, item_id, name)
+        return 'http://'+BaseService._interface+':%s/%s/%s/%s/%s/%s' % (KodiUtils.get_addon_setting('download.service.port', 'script.module.clouddrive.common'), addonid, driveid, item_driveid, item_id, name)
         
         

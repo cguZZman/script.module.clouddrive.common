@@ -21,12 +21,12 @@
 '''
 
 import urllib
-import urllib2
+from clouddrive.common.remote.request import Request
 
 
 class ErrorReport(object):
     _report_url = 'https://kodi-login.herokuapp.com/report'
     #_report_url = 'http://localhost:8888/report'
     def send_report(self, report):
-        urllib2.urlopen(self._report_url, urllib.urlencode({'stacktrace' : report})).read()
+        Request(self._report_url, urllib.urlencode({'stacktrace' : report})).request()
     

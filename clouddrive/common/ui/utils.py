@@ -20,9 +20,12 @@
     @author: Carlos Guzman (cguZZman) carlosguzmang@hotmail.com
 '''
 import xbmc
+import xbmcgui
 import xbmcaddon
 import json
 from clouddrive.common.utils import Utils
+import urllib
+from clouddrive.common.ui.logger import Logger
 
 class KodiUtils:
     
@@ -38,11 +41,24 @@ class KodiUtils:
         return xbmc.Monitor()
     
     @staticmethod
+    def get_window(window_id):
+        return xbmcgui.Window(window_id)
+    
+    @staticmethod
     def execute_json_rpc(method, params=None, request_id=1):
         cmd = {'jsonrpc': '2.0', 'method': method, 'id': request_id}
         if params:
             cmd['params'] = params
         return json.loads(xbmc.executeJSONRPC(json.dumps(cmd)))
+    
+    @staticmethod
+    def run_plugin(addonid, params=None):
+        url = 'plugin://%s/' % addonid
+        if params:
+            url += '?%s' % urllib.urlencode(params)
+        cmd = 'RunPlugin(%s)' % url
+        xbmc.executebuiltin(cmd, True)
+        Logger.notice(cmd)
     
     @staticmethod
     def is_addon_enabled(addonid):
