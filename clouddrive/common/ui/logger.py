@@ -20,23 +20,18 @@
     @author: Carlos Guzman (cguZZman) carlosguzmang@hotmail.com
 '''
 
-from clouddrive.common.utils import Utils
-import xbmc
-import xbmcaddon
+from clouddrive.common.ui.utils import KodiUtils
+
 
 class Logger:
     @staticmethod
-    def _log(msg, level):
-        xbmc.log('[' + xbmcaddon.Addon().getAddonInfo('id') + '] ' + Utils.str(msg), level)
-        
-    @staticmethod
     def debug(msg):
-        Logger._log(msg, xbmc.LOGNOTICE)
+        KodiUtils.log(msg, KodiUtils.LOGNOTICE)
     
     @staticmethod
     def notice(msg):
-        Logger._log(msg, xbmc.LOGNOTICE)
+        KodiUtils.log(msg, KodiUtils.LOGNOTICE)
     
     @staticmethod
     def error(msg):
-        Logger._log(msg, xbmc.LOGERROR)
+        KodiUtils.log(msg, KodiUtils.LOGERROR)

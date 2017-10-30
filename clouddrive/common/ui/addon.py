@@ -34,7 +34,6 @@ from clouddrive.common.account import AccountManager, AccountNotFoundException, 
 from clouddrive.common.exception import UIException, ExceptionUtils, RequestException
 from clouddrive.common.remote.errorreport import ErrorReport
 from clouddrive.common.remote.signin import Signin
-from clouddrive.common.service.download import DownloadServiceUtil
 from clouddrive.common.service.rpc import RemoteProcessCallable
 from clouddrive.common.ui.dialog import DialogProgress, DialogProgressBG
 from clouddrive.common.ui.logger import Logger
@@ -44,6 +43,7 @@ import xbmcaddon
 import xbmcgui
 import xbmcplugin
 import xbmcvfs
+from clouddrive.common.service.download import DownloadServiceUtil
 
 
 class CloudDriveAddon(RemoteProcessCallable):
@@ -194,20 +194,19 @@ class CloudDriveAddon(RemoteProcessCallable):
         tokens_info = {}
         request_params['on_complete'] = lambda request: self._progress_dialog_bg.close()
         self._progress_dialog.update(100, self._common_addon.getLocalizedString(32009) % Signin._signin_url, self._common_addon.getLocalizedString(32010) % pin_info['pin'])
-        current_time = time.time()
-        max_waiting_time = current_time + self._DEFAULT_SIGNIN_TIMEOUT
-        while not self.cancel_operation() and max_waiting_time > current_time:
-            remaining = round(max_waiting_time-current_time)
+        max_waiting_time = time.time() + self._DEFAULT_SIGNIN_TIMEOUT
+        while not self.cancel_operation() and max_waiting_time > time.time():
+            remaining = round(max_waiting_time-time.time())
             percent = int(remaining/self._DEFAULT_SIGNIN_TIMEOUT*100)
             self._progress_dialog.update(percent, line3=self._common_addon.getLocalizedString(32011) % str(int(remaining)))
             if int(remaining) % 5 == 0 or remaining == 1:
                 tokens_info = provider.fetch_tokens_info(pin_info, request_params = request_params)
                 if self.cancel_operation() or tokens_info:
                     break
-            self._system_monitor.waitForAbort(1)
-            current_time = time.time()
+            if self._system_monitor.waitForAbort(1):
+                break
         
-        if self.cancel_operation() or current_time >= max_waiting_time:
+        if self.cancel_operation() or time.time() >= max_waiting_time:
             return
         if not tokens_info:
             raise Exception('Unable to retrieve the auth2 tokens')
@@ -379,21 +378,17 @@ class CloudDriveAddon(RemoteProcessCallable):
     def _refresh_slideshow(self, driveid, item_driveid, item_id, path, child_count, wait_for_slideshow):
         if wait_for_slideshow:
             Logger.debug('Waiting up to 10 minutes until the slideshow for folder %s starts...' % Utils.default(item_id, path))
-            current_time = time.time()
-            max_waiting_time = current_time + 10 * 60
-            while not self.cancel_operation() and not xbmc.getCondVisibility('Slideshow.IsActive') and max_waiting_time > current_time:
+            max_waiting_time = time.time() + 10 * 60
+            while not self.cancel_operation() and not xbmc.getCondVisibility('Slideshow.IsActive') and max_waiting_time > time.time():
                 if self._system_monitor.waitForAbort(2):
                     break
-                current_time = time.time()
             self._print_slideshow_info()
         interval = self._addon.getSetting('slideshow_refresh_interval')
         Logger.debug('Waiting up to %s minute(s) to check if it is needed to refresh the slideshow of folder %s...' % (interval, Utils.default(item_id, path)))
-        current_time = time.time()
-        target_time = current_time + int(interval) * 60
-        while not self.cancel_operation() and target_time > current_time and xbmc.getCondVisibility('Slideshow.IsActive'):
+        target_time = time.time() + int(interval) * 60
+        while not self.cancel_operation() and target_time > time.time() and xbmc.getCondVisibility('Slideshow.IsActive'):
             if self._system_monitor.waitForAbort(10):
                 break
-            current_time = time.time()
         self._print_slideshow_info()
         if not self.cancel_operation() and xbmc.getCondVisibility('Slideshow.IsActive'):
             try:
@@ -447,7 +442,8 @@ class CloudDriveAddon(RemoteProcessCallable):
             try:
                 xbmcvfs.mkdirs(folder_path)
             except:
-                self._system_monitor.waitForAbort(3)
+                if self._system_monitor.waitForAbort(3):
+                    return
                 xbmcvfs.mkdirs(folder_path)
         items = self.get_folder_items(driveid, Utils.default(Utils.get_safe_value(folder, 'drive_id'), driveid), folder['id'])
         if self.cancel_operation():

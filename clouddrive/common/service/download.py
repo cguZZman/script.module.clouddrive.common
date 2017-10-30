@@ -21,53 +21,56 @@
 '''
 
 
-from clouddrive.common.service.base import BaseService, BaseHandler
-from clouddrive.common.service.rpc import RpcUtil
-from clouddrive.common.ui.utils import KodiUtils
 from urllib2 import HTTPError
+
+import cherrypy
 from clouddrive.common.exception import ExceptionUtils
+from clouddrive.common.service.rpc import RpcUtil
 from clouddrive.common.ui.logger import Logger
+from clouddrive.common.ui.utils import KodiUtils
 
 
-class DownloadService(BaseService):
-    def __init__(self):
-        super(DownloadService, self).__init__()
-        self._service_name = 'download'
-        self._handler = Download
+@cherrypy.expose   
+class Download(object):
+    name = 'download'
+    app_config = {'request.dispatch': cherrypy.dispatch.MethodDispatcher()}
     
-class Download(BaseHandler):
-    def do_GET(self):
-        data = self.path.split('/')
+    def _cp_dispatch(self, vpath):
+        if len(vpath) > 3:
+            cherrypy.request.params['addonid'] = vpath.pop()
+            cherrypy.request.params['driveid'] = vpath.pop()
+            cherrypy.request.params['item_driveid'] = vpath.pop()
+            cherrypy.request.params['item_id'] = vpath.pop()
+            return self
+    
+    def GET(self, addonid, driveid, item_driveid, item_id):
         code = 307
-        headers = {}
         content = None
-        if len(data) > 3:
-            try:
-                item = RpcUtil.execute_remote_method(data[1], 'get_item', kwargs = {
-                    'driveid' : data[2],
-                    'item_driveid' : data[3],
-                    'item_id' : data[4],
-                    'include_download_info' : True
-                })
-                headers['location'] = item['download_info']['url']
-            except Exception as e:
-                httpex = ExceptionUtils.extract_exception(e, HTTPError)
-                if httpex:
-                    code = httpex.code
-                else:
-                    code = 500
-                content = ExceptionUtils.full_stacktrace(e)
-                Logger.error('DownloadException:')
-                Logger.error(content)
-        else:
-            code = 400
-            content = 'Not enough parameters'
-        self.write_response(code, content=content, headers=headers)
+        try:
+            item = RpcUtil.execute_remote_method(addonid, 'get_item', kwargs = {
+                'driveid' : driveid,
+                'item_driveid' : item_driveid,
+                'item_id' : item_id,
+                'include_download_info' : True
+            })
+            cherrypy.response.headers['location'] = item['download_info']['url']
+        except Exception as e:
+            httpex = ExceptionUtils.extract_exception(e, HTTPError)
+            if httpex:
+                code = httpex.code
+            else:
+                code = 500
+            content = ExceptionUtils.full_stacktrace(e)
+            Logger.error('DownloadException:')
+            Logger.error(content)
+            
+        cherrypy.response.status = code
+        return content
         
 
 class DownloadServiceUtil(object):
     @staticmethod
     def build_download_url(addonid, driveid, item_driveid, item_id, name):
-        return 'http://'+BaseService._interface+':%s/%s/%s/%s/%s/%s' % (KodiUtils.get_addon_setting('download.service.port', 'script.module.clouddrive.common'), addonid, driveid, item_driveid, item_id, name)
+        return 'http://127.0.0.1:%s/download/%s/%s/%s/%s/%s' % (KodiUtils.get_addon_setting('download.service.port', 'script.module.clouddrive.common'), addonid, driveid, item_driveid, item_id, name)
         
         

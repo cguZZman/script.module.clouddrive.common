@@ -25,9 +25,12 @@ import xbmcaddon
 import json
 from clouddrive.common.utils import Utils
 import urllib
-from clouddrive.common.ui.logger import Logger
+import threading
 
 class KodiUtils:
+    LOGDEBUG = xbmc.LOGDEBUG
+    LOGNOTICE = xbmc.LOGNOTICE
+    LOGERROR = xbmc.LOGERROR
     
     @staticmethod
     def get_addon(addonid=None):
@@ -58,7 +61,6 @@ class KodiUtils:
             url += '?%s' % urllib.urlencode(params)
         cmd = 'RunPlugin(%s)' % url
         xbmc.executebuiltin(cmd, True)
-        Logger.notice(cmd)
     
     @staticmethod
     def is_addon_enabled(addonid):
@@ -85,3 +87,7 @@ class KodiUtils:
         info = addon.getAddonInfo(info_id)
         del addon
         return info
+    
+    @staticmethod
+    def log(msg, level):
+        xbmc.log('[%s][%s] %s' % (KodiUtils.get_addon_info('id'), threading.current_thread().name, msg), level)

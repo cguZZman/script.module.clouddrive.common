@@ -19,10 +19,11 @@
     Created on Mar 1, 2015
     @author: Carlos Guzman (cguZZman) carlosguzmang@hotmail.com
 '''
-from clouddrive.common.service.download import DownloadService
-from clouddrive.common.service.source import SourceService
-from clouddrive.common.service.base import BaseService
+
+from clouddrive.common.service import ServiceUtil
+from clouddrive.common.service.download import Download
+from clouddrive.common.service.server import ServerService
 
 if __name__ == '__main__':
-    BaseService.run([DownloadService(), SourceService()])
+    ServiceUtil.run(ServerService(Download()))
     

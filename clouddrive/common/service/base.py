@@ -20,74 +20,11 @@
     @author: Carlos Guzman (cguZZman) carlosguzmang@hotmail.com
 '''
 from BaseHTTPServer import BaseHTTPRequestHandler
-from SocketServer import ThreadingTCPServer
-import SocketServer
-import socket
-from threading import Thread
 
 from clouddrive.common.ui.logger import Logger
 from clouddrive.common.ui.utils import KodiUtils
-from clouddrive.common.utils import Utils
 import threading
 
-
-class BaseService(object):
-    _interface = '127.0.0.1'
-    _server = None
-    _thread = None
-    _service_name = ''
-    _handler = None
-    data = None
-    
-    def __init__(self, data=None):
-        SocketServer.TCPServer.allow_reuse_address = True
-        self.data = data
-    
-    def get_port(self):
-        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        sock.bind((self._interface, 0))
-        port = sock.getsockname()[1]
-        sock.close()
-        return port
-    
-    def start(self):
-        port = self.get_port()
-        KodiUtils.set_addon_setting(self._service_name + '.service.port', str(port))
-        self._server = BaseServer((self._interface, port), self._handler, self, self.data)
-        self._server.server_activate()
-        self._server.timeout = 1
-        self._thread = Thread(target=self._server.serve_forever)
-        self._thread.daemon = True
-        self._thread.start()
-        Logger.notice('Service [%s] started in port %s' % (self._service_name, port))
-    
-    def stop(self):
-        if self._server:
-            self._server.shutdown()
-            self._server.server_close()
-            Logger.notice('Service [%s] stopped' % self._service_name)
-    
-    @staticmethod
-    def run(services):
-        for service in services:
-            service.start()
-        monitor = KodiUtils.get_system_monitor()
-        while not monitor.abortRequested():
-            if monitor.waitForAbort(1):
-                break
-        for service in services:
-            service.stop()
-
-class BaseServer(ThreadingTCPServer):
-    data = None
-    service = None
-    version = None
-    def __init__(self, server_address, RequestHandlerClass, service, data=None):
-        self.data = data
-        self.service = service
-        self.daemon_threads = True
-        ThreadingTCPServer.__init__(self, server_address, RequestHandlerClass)
-        
     
 class BaseHandler(BaseHTTPRequestHandler):
     content_type = 'text/html; charset=UTF-8'

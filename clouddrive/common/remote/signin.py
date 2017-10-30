@@ -27,7 +27,7 @@ import base64
 
 
 class Signin(object):
-    _signin_url = 'http://localhost:8888'
+    _signin_url = 'https://kodi-login.herokuapp.com'
     
     def create_pin(self, provider_name, request_params={}):
         body = urllib.urlencode({'provider': provider_name})

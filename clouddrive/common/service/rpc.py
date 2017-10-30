@@ -58,19 +58,15 @@ class RpcUtil(object):
         key = '%s-%s' % (addonid, exec_id)
         status_key = '%s.status' % key
         home_window = KodiUtils.get_window(10000)
-        current_time = time.time()
-        target_time = current_time + 5
-        while target_time > current_time:
+        timeout = time.time() + 5
+        while timeout > time.time():
             if home_window.getProperty(status_key):
                 break
-            current_time = time.time()
         status = home_window.getProperty(status_key)
         if status:
-            current_time = time.time()
-            target_time = current_time + 60
-            while status == 'in-progress' and target_time > current_time:
+            timeout = time.time() + 60
+            while status == 'in-progress' and timeout > time.time():
                 status = home_window.getProperty('%s.status' % key)
-                current_time = time.time()
             if status != 'in-progress':
                 result = home_window.getProperty('%s.result' % key)
                 if status == 'success':
