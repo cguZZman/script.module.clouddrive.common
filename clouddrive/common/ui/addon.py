@@ -43,7 +43,7 @@ import xbmcaddon
 import xbmcgui
 import xbmcplugin
 import xbmcvfs
-from clouddrive.common.service.download import DownloadServiceUtil
+from clouddrive.common.service.utils import DownloadServiceUtil
 
 
 class CloudDriveAddon(RemoteProcessCallable):

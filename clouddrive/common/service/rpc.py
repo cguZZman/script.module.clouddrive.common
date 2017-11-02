@@ -20,14 +20,17 @@
     @author: Carlos Guzman (cguZZman) carlosguzmang@hotmail.com
 '''
 
+import inspect
 import time
 import uuid
 
 from clouddrive.common.ui.utils import KodiUtils
+from clouddrive.common.ui.logger import Logger
 
 
 class RemoteProcessCallable(object):
     def on_execute_method(self, exec_id, method, args='[]', kwargs='{}'):
+        Logger.notice('now on_execute_method %s...' % method)
         home_window = KodiUtils.get_window(10000)
         key = '%s-%s' % (self._addonid, exec_id)
         status_key = '%s.status' % key
@@ -36,7 +39,12 @@ class RemoteProcessCallable(object):
             home_window.setProperty(status_key, 'in-progress')
             args = eval(args)
             kwargs = eval(kwargs)
-            home_window.setProperty(result_key, repr(getattr(self, method)(*args, **kwargs)))
+            method = getattr(self, method)
+            fkwargs = {}
+            for name in inspect.getargspec(method)[0]:
+                if name in kwargs:
+                    fkwargs[name] = kwargs[name]
+            home_window.setProperty(result_key, repr(method(*args, **fkwargs)))
             home_window.setProperty(status_key, 'success')
         except Exception as e:
             home_window.setProperty(result_key, repr(e))
@@ -48,6 +56,7 @@ class RpcUtil(object):
     def execute_remote_method(addonid, method, args=[], kwargs={}, exec_id=None):
         if not exec_id:
             exec_id = uuid.uuid4()
+        Logger.notice('Executing remote method with script %s...' % method)
         KodiUtils.run_plugin(addonid, {
             'action' : 'on_execute_method',
             'method' : method,
@@ -55,16 +64,20 @@ class RpcUtil(object):
             'args' : repr(args),
             'kwargs' : repr(kwargs)
         })
+        Logger.notice('executed')
         key = '%s-%s' % (addonid, exec_id)
         status_key = '%s.status' % key
         home_window = KodiUtils.get_window(10000)
-        timeout = time.time() + 5
+        timeout = time.time() + 15
+        Logger.notice('waiting to start...')
         while timeout > time.time():
             if home_window.getProperty(status_key):
                 break
+        Logger.notice('started')
         status = home_window.getProperty(status_key)
         if status:
             timeout = time.time() + 60
+            Logger.notice('waiting to finish...')
             while status == 'in-progress' and timeout > time.time():
                 status = home_window.getProperty('%s.status' % key)
             if status != 'in-progress':
@@ -77,5 +90,4 @@ class RpcUtil(object):
                 raise Exception('MethodExecution: Finish timeout')
         else:
             raise Exception('MethodExecution: Start timeout')       
-            
         

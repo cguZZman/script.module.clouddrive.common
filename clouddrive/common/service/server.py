@@ -50,7 +50,12 @@ class ServerService(object):
         KodiUtils.set_addon_setting(self.name + '.service.port', str(port))
         cherrypy.config.update({'server.socket_port': port})
         for app in self.apps:
-            cherrypy.tree.mount(app, '/%s' % app.name, {'/' : app.app_config})
+            mount_path = '/%s' % app.name
+            config = None
+            if hasattr(app, 'app_config'):
+                config = {'/' : app.app_config}
+            cherrypy.tree.mount(app, mount_path, config)
+            Logger.notice('Mount: %s' % mount_path)
         cherrypy.engine.signals.subscribe()
         cherrypy.engine.start()
         Logger.notice('Server Service started in port %s' % (port))
