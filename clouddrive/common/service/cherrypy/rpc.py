@@ -21,56 +21,14 @@
 '''
 
 import inspect
+import time
+import uuid
 
+from clouddrive.common.ui.utils import KodiUtils
 from clouddrive.common.ui.logger import Logger
-from clouddrive.common.service.base import BaseService, BaseHandler
-from clouddrive.common.utils import Utils
-from clouddrive.common.exception import ExceptionUtils
-from urllib2 import HTTPError
 
-class RpcService(BaseService):
-    name = 'rpc'
-    def __init__(self, listener):
-        super(RpcService, self).__init__(listener)
-        self._handler = RpcHandler
-    
-class RpcHandler(BaseHandler):
-    def do_POST(self):
-        content = Utils.get_file_buffer()
-        try:
-            size = int(self.headers.getheader('content-length', 0))
-            cmd = eval(self.rfile.read(size))
-            method = Utils.get_safe_value(cmd, 'method')
-            if method:
-                code = 200
-                args = Utils.get_safe_value(cmd, 'args', [])
-                kwargs = Utils.get_safe_value(cmd, 'kwargs', {})
-                Logger.debug('Command received:\n%s' % cmd)
-                content.write(repr(self.server.data.rpc(method, args, kwargs)))
-            else:
-                code = 400
-                content.write('Method required')
-        except Exception as e:
-            httpex = ExceptionUtils.extract_exception(e, HTTPError)
-            if httpex:
-                code = httpex.code
-            else:
-                code = 500
-            content.write(ExceptionUtils.full_stacktrace(e))
-        self.write_response(code, content=content)
-        
 
 class RemoteProcessCallable(object):
- 
-    def rpc(self, method, args=[], kwargs={}):
-        method = getattr(self, method)
-        fkwargs = {}
-        for name in inspect.getargspec(method)[0]:
-            if name in kwargs:
-                fkwargs[name] = kwargs[name]
-        return method(*args, **fkwargs)
-    
-    '''
     def on_execute_method(self, exec_id, method, args='[]', kwargs='{}'):
         Logger.notice('now on_execute_method %s...' % method)
         home_window = KodiUtils.get_window(10000)
@@ -92,5 +50,44 @@ class RemoteProcessCallable(object):
             home_window.setProperty(result_key, repr(e))
             home_window.setProperty(status_key, 'fail')
             raise e
-    '''
+        
+class RpcUtil(object):
+    @staticmethod
+    def execute_remote_method(addonid, method, args=[], kwargs={}, exec_id=None):
+        if not exec_id:
+            exec_id = uuid.uuid4()
+        Logger.notice('Executing remote method with script %s...' % method)
+        KodiUtils.run_plugin(addonid, {
+            'action' : 'on_execute_method',
+            'method' : method,
+            'exec_id' : exec_id,
+            'args' : repr(args),
+            'kwargs' : repr(kwargs)
+        })
+        Logger.notice('executed')
+        key = '%s-%s' % (addonid, exec_id)
+        status_key = '%s.status' % key
+        home_window = KodiUtils.get_window(10000)
+        timeout = time.time() + 15
+        Logger.notice('waiting to start...')
+        while timeout > time.time():
+            if home_window.getProperty(status_key):
+                break
+        Logger.notice('started')
+        status = home_window.getProperty(status_key)
+        if status:
+            timeout = time.time() + 60
+            Logger.notice('waiting to finish...')
+            while status == 'in-progress' and timeout > time.time():
+                status = home_window.getProperty('%s.status' % key)
+            if status != 'in-progress':
+                result = home_window.getProperty('%s.result' % key)
+                if status == 'success':
+                    return eval(result)
+                else:
+                    raise Exception(result)
+            else:
+                raise Exception('MethodExecution: Finish timeout')
+        else:
+            raise Exception('MethodExecution: Start timeout')       
         

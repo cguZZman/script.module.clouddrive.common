@@ -30,7 +30,7 @@ from clouddrive.common.ui.logger import Logger
 from clouddrive.common.exception import ExceptionUtils
 from urllib2 import HTTPError
 import threading
-from clouddrive.common.service.rpc import RpcUtil
+from clouddrive.common.service.utils import RpcUtil
 
 
 

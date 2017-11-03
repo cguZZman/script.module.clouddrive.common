@@ -224,11 +224,9 @@ See the end of the source file for the license of use.
 XHTML support was contributed by Michael Haubenwallner.
 '''
 
-from __future__ import with_statement
-
 import cgi
 
-from lib.clouddrive.common.utils import Utils
+from clouddrive.common.utils import Utils
 
 
 __version__ = '1.16'
@@ -399,7 +397,7 @@ class XML(XHTML):
 
     All tags with no contents are reduced to self-terminating tags.
     '''
-    newline_default_on = set()          # no tags are special
+    newline_default_on = set()  # no tags are special
 
     def _stringify(self, str_type):
         # turn me and my content into text

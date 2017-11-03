@@ -20,6 +20,11 @@
     @author: Carlos Guzman (cguZZman) carlosguzmang@hotmail.com
 '''
 
+try:
+    from cStringIO import StringIO
+except ImportError:
+    from StringIO import StringIO
+    
 class Utils:
     @staticmethod
     def get_extension(name):
@@ -78,3 +83,6 @@ class Utils:
             module = getattr(module, comp)
         return module
     
+    @staticmethod
+    def get_file_buffer():
+        return StringIO()

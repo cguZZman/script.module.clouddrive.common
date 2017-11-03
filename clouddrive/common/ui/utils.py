@@ -55,22 +55,17 @@ class KodiUtils:
         return json.loads(xbmc.executeJSONRPC(json.dumps(cmd)))
     
     @staticmethod
-    def run_script(addonid, params=None):
-        url = 'plugin://%s/' % addonid
-        if params:
-            url += '?%s' % urllib.urlencode(params)
-        cmd = 'RunScript(%s)' % url
-        xbmc.executebuiltin(cmd, True)
-        #xbmc.executebuiltin(cmd)
+    def run_script(addonid, params=None, wait=False):
+        cmd = 'RunScript(%s,0,%s)' % (addonid, '?%s' % urllib.urlencode(params))
+        xbmc.executebuiltin(cmd, wait)
         
     @staticmethod
-    def run_plugin(addonid, params=None):
+    def run_plugin(addonid, params=None, wait=False):
         url = 'plugin://%s/' % addonid
         if params:
             url += '?%s' % urllib.urlencode(params)
         cmd = 'RunPlugin(%s)' % url
-        xbmc.executebuiltin(cmd, True)
-        #xbmc.executebuiltin(cmd)
+        xbmc.executebuiltin(cmd, wait)
     
     @staticmethod
     def is_addon_enabled(addonid):
@@ -100,8 +95,12 @@ class KodiUtils:
     
     @staticmethod
     def get_server_service_port():
-        return KodiUtils.get_addon_setting('server.service.port', 'script.module.clouddrive.common')
+        return KodiUtils.get_service_port('server', 'script.module.clouddrive.common')
+    
+    @staticmethod
+    def get_service_port(service, addonid=None):
+        return KodiUtils.get_addon_setting('%s.service.port' % service, addonid)
     
     @staticmethod
     def log(msg, level):
-        xbmc.log('[%s][%s]: %s' % (KodiUtils.get_addon_info('id'), threading.current_thread().name, msg), level)
+        xbmc.log('[%s][%s-%s]: %s' % (KodiUtils.get_addon_info('id'), threading.current_thread().name,threading.current_thread().ident, msg), level)

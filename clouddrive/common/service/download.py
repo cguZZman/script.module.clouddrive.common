@@ -21,43 +21,54 @@
 '''
 
 
+from clouddrive.common.service.base import BaseService, BaseHandler
 from urllib2 import HTTPError
-
-import cherrypy
 from clouddrive.common.exception import ExceptionUtils
-from clouddrive.common.service.rpc import RpcUtil
 from clouddrive.common.ui.logger import Logger
+from clouddrive.common.service.utils import RpcUtil
+from clouddrive.common.utils import Utils
 
 
-@cherrypy.expose   
-class Download(object):
+class DownloadService(BaseService):
     name = 'download'
-    app_config = {'request.dispatch': cherrypy.dispatch.MethodDispatcher()}
     
-    def _cp_dispatch(self, vpath):
-        if len(vpath) > 3:
-            cherrypy.request.params['name'] = vpath.pop()
-            cherrypy.request.params['item_id'] = vpath.pop()
-            cherrypy.request.params['item_driveid'] = vpath.pop()
-            cherrypy.request.params['driveid'] = vpath.pop()
-            cherrypy.request.params['addonid'] = vpath.pop()
-            return self
+    def __init__(self):
+        super(DownloadService, self).__init__()
+        self._handler = Download
     
-    def GET(self, **kwargs):
-        try:
-            Logger.notice('Download request: %s' % kwargs)
-            kwargs['include_download_info'] = True
-            item = RpcUtil.execute_remote_method(kwargs['addonid'], 'get_item', kwargs = kwargs)
-            Logger.notice('Item returned: %s' % item)
-        except Exception as e:
-            httpex = ExceptionUtils.extract_exception(e, HTTPError)
-            if httpex:
-                code = httpex.code
-            else:
-                code = 500
-            message = ExceptionUtils.full_stacktrace(e)
-            Logger.error('DownloadException:')
-            Logger.error(message)
-            raise cherrypy.HTTPError(code, message)
-        raise cherrypy.HTTPRedirect(item['download_info']['url'], status=307)
+class Download(BaseHandler):
+    def do_GET(self):
+        Logger.debug(self.path)
+        data = self.path.split('/')
+        code = 307
+        headers = {}
+        content = Utils.get_file_buffer()
+        if len(data) > 3:
+            try:
+                item = RpcUtil.rpc(data[1], 'get_item', kwargs = {
+                    'driveid' : data[2],
+                    'item_driveid' : data[3],
+                    'item_id' : data[4],
+                    'include_download_info' : True
+                })
+                '''
+                item = RpcUtil.execute_remote_method(data[1], 'get_item', kwargs = {
+                    'driveid' : data[2],
+                    'item_driveid' : data[3],
+                    'item_id' : data[4],
+                    'include_download_info' : True
+                })
+                '''
+                headers['location'] = item['download_info']['url']
+            except Exception as e:
+                httpex = ExceptionUtils.extract_exception(e, HTTPError)
+                if httpex:
+                    code = httpex.code
+                else:
+                    code = 500
+                content.write(ExceptionUtils.full_stacktrace(e))
+        else:
+            code = 400
+            content.write('Not enough parameters')
+        self.write_response(code, content=content, headers=headers)
         

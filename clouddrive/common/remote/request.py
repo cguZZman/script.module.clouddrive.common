@@ -91,9 +91,10 @@ class Request(object):
             request_report = 'Request URL: ' + Utils.str(self.url)
             request_report += '\nRequest data: ' + Utils.str(self.data)
             request_report += '\nRequest headers: ' + Utils.str(self.headers)
-            response_report = '<not_set>'
+            response_report = '<response_not_set>'
             response = None
             try:
+                Logger.debug(request_report)
                 req = urllib2.Request(self.url, self.data, self.headers)
                 response = urllib2.urlopen(req)
                 self.response_code = response.getcode()
@@ -134,7 +135,7 @@ class Request(object):
                     current_time = time.time()
                 self.current_delay *= self.backoff
             finally:
-                Logger.debug(request_report + response_report);
+                Logger.debug(response_report);
                 if response:
                     response.close()
         if self.success and self.on_success:

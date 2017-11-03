@@ -35,6 +35,7 @@ from clouddrive.common.exception import UIException, ExceptionUtils, RequestExce
 from clouddrive.common.remote.errorreport import ErrorReport
 from clouddrive.common.remote.signin import Signin
 from clouddrive.common.service.rpc import RemoteProcessCallable
+from clouddrive.common.service.utils import DownloadServiceUtil
 from clouddrive.common.ui.dialog import DialogProgress, DialogProgressBG
 from clouddrive.common.ui.logger import Logger
 from clouddrive.common.utils import Utils
@@ -43,7 +44,6 @@ import xbmcaddon
 import xbmcgui
 import xbmcplugin
 import xbmcvfs
-from clouddrive.common.service.utils import DownloadServiceUtil
 
 
 class CloudDriveAddon(RemoteProcessCallable):
