@@ -21,23 +21,20 @@
 '''
 
 import urllib
+from urllib2 import HTTPError
 
+from clouddrive.common.exception import ExceptionUtils
 from clouddrive.common.html import XHTML
 from clouddrive.common.service.base import BaseService, BaseHandler
+from clouddrive.common.service.utils import RpcUtil
 from clouddrive.common.ui.utils import KodiUtils
 from clouddrive.common.utils import Utils
-from clouddrive.common.ui.logger import Logger
-from clouddrive.common.exception import ExceptionUtils
-from urllib2 import HTTPError
-import threading
-from clouddrive.common.service.utils import RpcUtil
-
 
 
 class SourceService(BaseService):
+    name = 'source'
     def __init__(self):
         super(SourceService, self).__init__()
-        self._service_name = 'source'
         self._handler = Source
     
     def get_port(self):
@@ -110,11 +107,13 @@ class Source(BaseHandler):
         for addon in self.get_cloud_drive_addons():
             self.add_row(table, addon['name'] + '/')
         self.close_table(table)
-        self.write_response(200, content = html)
+        response = Utils.get_file_buffer()
+        response.write(str(html))
+        self.write_response(200, content=response)
     
     def get_drive_list(self, addonid):
         drives = []
-        accounts = RpcUtil.execute_remote_method(addonid, 'get_accounts')
+        accounts = RpcUtil.rpc(addonid, 'get_accounts')
         for account_id in accounts:
             account = accounts[account_id]
             for drive in account['drives']:
@@ -154,11 +153,14 @@ class Source(BaseHandler):
         else:
             response_code = 404
             html = 'Cloud Drive addon "%s" does not exist' % addon_name
-        self.write_response(response_code, content=html)
+        response = Utils.get_file_buffer()
+        response.write(str(html))
+        self.write_response(response_code, content=response)
     
     def process_path(self, addon_name, drive_name, path):
         addonid = self.get_addonid(addon_name)
         headers = {}
+        response = Utils.get_file_buffer()
         if addonid:
             driveid = self.get_driveid(addonid, drive_name)
             if driveid:
@@ -170,23 +172,22 @@ class Source(BaseHandler):
                     else:
                         url = self.path + '/'
                     headers['location'] = url
-                    response = None
                 else:
                     response_code = 200
-                    response = self.show_folder(addonid, driveid, path)
+                    response.write(str(self.show_folder(addonid, driveid, path)))
             else:
                 response_code = 404
-                response = 'Drive "%s" does not exist for addon "%s"' % (drive_name, addon_name)
+                response.write('Drive "%s" does not exist for addon "%s"' % (drive_name, addon_name))
         else:
             response_code = 404
-            response = 'Cloud Drive addon "%s" does not exist' % addon_name
+            response.write('Cloud Drive addon "%s" does not exist' % addon_name)
         self.write_response(response_code, content=response, headers=headers)
 
     def show_folder(self, addonid, driveid, path):
         path_len = len(path)
         if path_len > 1:
             path = path[:path_len-1]
-        items = RpcUtil.execute_remote_method(addonid, 'get_folder_items', kwargs={'driveid': driveid, 'path': path})
+        items = RpcUtil.rpc(addonid, 'get_folder_items', kwargs={'driveid': driveid, 'path': path})
         html, table = self.open_table('Index of ' + self.path)
         self.add_row(table, '../')
         for item in items:
@@ -201,15 +202,13 @@ class Source(BaseHandler):
         return html
     
     def get_download_url(self, addonid, driveid, path):
-        item = RpcUtil.execute_remote_method(addonid, 'get_item', kwargs={'driveid': driveid, 'path': path, 'include_download_info': True})
+        item = RpcUtil.rpc(addonid, 'get_item', kwargs={'driveid': driveid, 'path': path, 'include_download_info': True})
         if 'folder' in item:
             return self.path + '/'
         return item['download_info']['url']
         
     def do_GET(self):
         try:
-            message_id = self.headers.getheader('message-id')
-            Logger.notice('[%s][%s][%s][%s] Source request incoming: %s' % (self.server.service._service_name, message_id, threading.current_thread().name, self, self.path))
             parts = self.path.split('/')
             addon_name = parts[1]
             if addon_name:
@@ -228,8 +227,8 @@ class Source(BaseHandler):
                 response_code = httpex.code
             else:
                 response_code = 500
-            response = ExceptionUtils.full_stacktrace(e)
-            Logger.error('[%s][%s][%s][%s][%s]\nException:\n%s' % (self.server.service._service_name, message_id, threading.current_thread().name, self, self.path, response))
-            self.write_response(response_code, content=response)
+            content = Utils.get_file_buffer()
+            content.write(ExceptionUtils.full_stacktrace(e))
+            self.write_response(response_code, content=content)
             
         

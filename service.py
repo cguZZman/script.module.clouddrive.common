@@ -24,5 +24,5 @@ from clouddrive.common.service.source import SourceService
 from clouddrive.common.service.utils import ServiceUtil
 
 if __name__ == '__main__':
-    ServiceUtil.run([DownloadService()])#, SourceService()])
+    ServiceUtil.run([DownloadService(), SourceService()])
     
