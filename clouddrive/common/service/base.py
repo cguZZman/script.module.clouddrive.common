@@ -53,8 +53,8 @@ class BaseService(object):
         port = self.get_port()
         KodiUtils.set_addon_setting(self.name + '.service.port', str(port))
         self._server = BaseServer((self._interface, port), self._handler, self, self.data)
-        self._server.server_activate()
-        self._server.timeout = 1
+        #self._server.server_activate()
+        #self._server.timeout = 1
         Logger.notice('Service \'%s\' started in port %s' % (self.name, port))
         self._server.serve_forever()
     
@@ -64,21 +64,23 @@ class BaseService(object):
             self._server.server_close()
             Logger.notice('Service stopped')
     
-class BaseServer(HTTPServer):
+class BaseServer(ThreadingTCPServer):
+    
     data = None
     service = None
     allow_reuse_address = True
+    
     def __init__(self, server_address, RequestHandlerClass, service, data=None):
         self.data = data
         self.service = service
-        HTTPServer.__init__(self, server_address, RequestHandlerClass)
-        #ThreadingTCPServer.__init__(self, server_address, RequestHandlerClass)
-    '''
+        #HTTPServer.__init__(self, server_address, RequestHandlerClass)
+        ThreadingTCPServer.__init__(self, server_address, RequestHandlerClass)
+    
     def process_request(self, request, client_address):
         thread = threading.Thread(target = self.process_request_thread, args = (request, client_address), name='%s-request' % threading.current_thread().name)
         thread.daemon = True
         thread.start()
-    '''    
+
 class BaseHandler(BaseHTTPRequestHandler):
     content_type = 'text/html; charset=UTF-8'
     response_code_sent = False
@@ -87,6 +89,7 @@ class BaseHandler(BaseHTTPRequestHandler):
     def __init__(self, request, client_address, server):
         self.protocol_version = 'HTTP/1.1'
         self.server_version = KodiUtils.get_addon_info('id') + '/' + KodiUtils.get_addon_info('version')
+        self.wbufsize = -1
         BaseHTTPRequestHandler.__init__(self, request, client_address, server)
     
     def write_response(self, code, message=None, content=None, headers={}):
