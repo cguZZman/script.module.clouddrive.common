@@ -3,7 +3,6 @@
 	version="1.0.0" provider-name="Carlos Guzman (cguZZman)">
 	<requires>
 		<import addon="xbmc.python" version="2.25.0" />
-		<import addon="script.module.cherrypy"/>
 	</requires>
 	<extension point="xbmc.python.module" library="/" />
 	<extension point="xbmc.service" library="service.py" start="login" />
@@ -13,7 +12,8 @@
 		<description lang="en">Common Services and Classes for all the cloud drive addons.</description>
 		<summary lang="he">מודול משותף לכונן בענן</summary>
 		<description lang="he">שירותים ושירותים משותפים לכל התוספים של כונן הענן.</description>		
-		<license>GNU GENERAL PUBLIC LICENSE. Version 2, June 1991</license>
-		<source>https://github.com/cguZZman/clouddrive-common-kodi-addon</source>
+		<license>GNU GENERAL PUBLIC LICENSE. Version 3, 29 June 2007</license>
+		<source>https://github.com/cguZZman/script.module.clouddrive.common</source>
+		<forum>https://github.com/cguZZman/script.module.clouddrive.common/issues</forum>
 	</extension>
 </addon>

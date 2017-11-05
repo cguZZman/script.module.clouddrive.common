@@ -1,33 +1,32 @@
-'''
-    OneDrive for Kodi
-    Copyright (C) 2015 - Carlos Guzman
+#-------------------------------------------------------------------------------
+# Copyright (C) 2017 Carlos Guzman (cguZZman) carlosguzmang@protonmail.com
+# 
+# This file is part of Cloud Drive Common Module for Kodi
+# 
+# Cloud Drive Common Module for Kodi is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+# 
+# Cloud Drive Common Module for Kodi is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+# 
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#-------------------------------------------------------------------------------
 
-    This program is free software; you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation; either version 2 of the License, or
-    (at your option) any later version.
 
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License along
-    with this program; if not, write to the Free Software Foundation, Inc.,
-    51 Franklin Street, OFifth Floor, Boston, MA 02110-1301 USA.
-
-    Created on Mar 1, 2015
-    @author: Carlos Guzman (cguZZman) carlosguzmang@hotmail.com
-'''
-from BaseHTTPServer import BaseHTTPRequestHandler, HTTPServer
+from BaseHTTPServer import BaseHTTPRequestHandler
 from SocketServer import ThreadingTCPServer
 import SocketServer
+import shutil
 import socket
 import threading
 
 from clouddrive.common.ui.logger import Logger
 from clouddrive.common.ui.utils import KodiUtils
-import shutil
 
 
 class BaseService(object):
@@ -53,8 +52,6 @@ class BaseService(object):
         port = self.get_port()
         KodiUtils.set_addon_setting(self.name + '.service.port', str(port))
         self._server = BaseServer((self._interface, port), self._handler, self, self.data)
-        #self._server.server_activate()
-        #self._server.timeout = 1
         Logger.notice('Service \'%s\' started in port %s' % (self.name, port))
         self._server.serve_forever()
     

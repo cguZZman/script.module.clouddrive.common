@@ -1,24 +1,21 @@
-'''
-    OneDrive for Kodi
-    Copyright (C) 2015 - Carlos Guzman
-
-    This program is free software; you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation; either version 2 of the License, or
-    (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License along
-    with this program; if not, write to the Free Software Foundation, Inc.,
-    51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
-
-    Created on Mar 1, 2015
-    @author: Carlos Guzman (cguZZman) carlosguzmang@hotmail.com
-'''
+#-------------------------------------------------------------------------------
+# Copyright (C) 2017 Carlos Guzman (cguZZman) carlosguzmang@protonmail.com
+# 
+# This file is part of Cloud Drive Common Module for Kodi
+# 
+# Cloud Drive Common Module for Kodi is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+# 
+# Cloud Drive Common Module for Kodi is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+# 
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#-------------------------------------------------------------------------------
 
 import inspect
 import os
@@ -35,7 +32,6 @@ from clouddrive.common.exception import UIException, ExceptionUtils, RequestExce
 from clouddrive.common.remote.errorreport import ErrorReport
 from clouddrive.common.remote.signin import Signin
 from clouddrive.common.service.rpc import RemoteProcessCallable
-from clouddrive.common.service.utils import DownloadServiceUtil
 from clouddrive.common.ui.dialog import DialogProgress, DialogProgressBG
 from clouddrive.common.ui.logger import Logger
 from clouddrive.common.utils import Utils
@@ -44,6 +40,7 @@ import xbmcaddon
 import xbmcgui
 import xbmcplugin
 import xbmcvfs
+from clouddrive.common.service.download import DownloadServiceUtil
 
 
 class CloudDriveAddon(RemoteProcessCallable):
@@ -344,11 +341,9 @@ class CloudDriveAddon(RemoteProcessCallable):
     
     def _search(self, driveid, item_driveid=None, item_id=None):
         query = self._dialog.input(self._addon_name + ' - ' + self._common_addon.getLocalizedString(32042))
-        Logger.notice('query = ' + query)
         if query:
             self._progress_dialog_bg.create(self._addon_name, self._common_addon.getLocalizedString(32041))
             items = self.search(query, driveid, item_driveid, item_id, on_items_page_completed = self.on_items_page_completed)
-            Logger.notice('result size = %d ' % len(items))
             if self.cancel_operation():
                 return
             self._process_items(items, driveid)
@@ -561,7 +556,6 @@ class CloudDriveAddon(RemoteProcessCallable):
         
     def route(self):
         try:
-            Logger.notice(self._addon_params)
             self._action = Utils.get_safe_value(self._addon_params, 'action')
             if self._action:
                 method = getattr(self, self._action)

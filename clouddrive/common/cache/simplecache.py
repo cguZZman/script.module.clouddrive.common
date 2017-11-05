@@ -1,20 +1,44 @@
+#-------------------------------------------------------------------------------
+# Copyright (C) 2017 Carlos Guzman (cguZZman) carlosguzmang@protonmail.com
+# 
+# This file is part of Cloud Drive Common Module for Kodi
+# 
+# Cloud Drive Common Module for Kodi is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+# 
+# Cloud Drive Common Module for Kodi is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+# 
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+# This file incorporates work covered by the following copyright:  
+#    Apache License Version 2.0, January 2004. http://www.apache.org/licenses/
+#    Author: Marcel van der Veldt (marcelveldt) - https://github.com/marcelveldt/script.module.simplecache
+#    Changes:
+#      - Memcache removed
+#      - Cleanup done in a single query call to avoid performance issue
+#      - Adapted for the use of Cloud Drive Common Module for Kodi
+#-------------------------------------------------------------------------------
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
-
 '''provides a simple stateless caching system for Kodi addons and plugins'''
 
-import xbmcvfs
-import xbmcgui
-import xbmc
-import xbmcaddon
 import datetime
-import time
-import sqlite3
 from functools import reduce
-from clouddrive.common.ui.logger import Logger
+import sqlite3
+import time
+
+from clouddrive.common.ui.utils import KodiUtils
+import xbmc
+import xbmcvfs
+
 
 ADDONID = "script.module.clouddrive.common"
-
 
 class SimpleCache(object):
     '''simple stateless caching system for Kodi'''
@@ -27,8 +51,8 @@ class SimpleCache(object):
 
     def __init__(self):
         '''Initialize our caching class'''
-        self._win = xbmcgui.Window(10000)
-        self._monitor = xbmc.Monitor()
+        self._win = KodiUtils.get_window(10000)
+        self._monitor = KodiUtils.get_system_monitor()
         self.check_cleanup()
 
     def close(self):
@@ -124,12 +148,10 @@ class SimpleCache(object):
 
     def _get_database(self):
         '''get reference to our sqllite _database - performs basic integrity check'''
-        addon = xbmcaddon.Addon(ADDONID)
-        dbpath = addon.getAddonInfo('profile')
+        dbpath = KodiUtils.get_addon_info('profile', ADDONID)
         dbfile = xbmc.translatePath("%s/simplecache.db" % dbpath).decode('utf-8')
         if not xbmcvfs.exists(dbpath):
             xbmcvfs.mkdirs(dbpath)
-        del addon
         try:
             connection = sqlite3.connect(dbfile, timeout=30, isolation_level=None)
             connection.execute('SELECT * FROM simplecache LIMIT 1')
@@ -145,7 +167,7 @@ class SimpleCache(object):
                     id TEXT UNIQUE, expires INTEGER, data TEXT, checksum INTEGER)""")
                 return connection
             except Exception as error:
-                self._log_msg("Exception while initializing _database: %s" % str(error), xbmc.LOGWARNING)
+                self._log_msg("Exception while initializing _database: %s" % str(error), KodiUtils.LOGWARNING)
                 self.close()
                 return None
 
@@ -176,15 +198,15 @@ class SimpleCache(object):
                         break
                 except Exception as error:
                     break
-            self._log_msg("_database ERROR ! -- %s" % str(error), xbmc.LOGWARNING)
+            self._log_msg("_database ERROR ! -- %s" % str(error), KodiUtils.LOGWARNING)
         return None
 
     @staticmethod
-    def _log_msg(msg, loglevel=xbmc.LOGNOTICE):
+    def _log_msg(msg, loglevel=KodiUtils.LOGNOTICE):
         '''helper to send a message to the kodi log'''
         if isinstance(msg, unicode):
             msg = msg.encode('utf-8')
-        Logger.debug(msg)
+        KodiUtils.log(msg, loglevel)
 
     @staticmethod
     def _get_timestamp(date_time):

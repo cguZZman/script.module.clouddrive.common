@@ -3,7 +3,6 @@
 	<name>script.module.clouddrive.common</name>
 	<comment></comment>
 	<projects>
-		<project>script.module.cherrypy</project>
 	</projects>
 	<buildSpec>
 		<buildCommand>

@@ -1,32 +1,30 @@
-'''
-    OneDrive for Kodi
-    Copyright (C) 2015 - Carlos Guzman
+#-------------------------------------------------------------------------------
+# Copyright (C) 2017 Carlos Guzman (cguZZman) carlosguzmang@protonmail.com
+# 
+# This file is part of Cloud Drive Common Module for Kodi
+# 
+# Cloud Drive Common Module for Kodi is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+# 
+# Cloud Drive Common Module for Kodi is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+# 
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#-------------------------------------------------------------------------------
 
-    This program is free software; you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation; either version 2 of the License, or
-    (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License along
-    with this program; if not, write to the Free Software Foundation, Inc.,
-    51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
-
-    Created on Mar 1, 2015
-    @author: Carlos Guzman (cguZZman) carlosguzmang@hotmail.com
-'''
-
-
-from clouddrive.common.service.base import BaseService, BaseHandler
 from urllib2 import HTTPError
+
 from clouddrive.common.exception import ExceptionUtils
+from clouddrive.common.service.base import BaseService, BaseHandler
 from clouddrive.common.ui.logger import Logger
-from clouddrive.common.service.utils import RpcUtil
 from clouddrive.common.utils import Utils
+from clouddrive.common.ui.utils import KodiUtils
+from clouddrive.common.service.rpc import RpcUtil
 
 
 class DownloadService(BaseService):
@@ -43,22 +41,14 @@ class Download(BaseHandler):
         code = 307
         headers = {}
         content = Utils.get_file_buffer()
-        if len(data) > 3:
+        if len(data) > 5 and data[1] == self.server.service.name:
             try:
-                item = RpcUtil.rpc(data[1], 'get_item', kwargs = {
-                    'driveid' : data[2],
-                    'item_driveid' : data[3],
-                    'item_id' : data[4],
+                item = RpcUtil.rpc(data[2], 'get_item', kwargs = {
+                    'driveid' : data[3],
+                    'item_driveid' : data[4],
+                    'item_id' : data[5],
                     'include_download_info' : True
                 })
-                '''
-                item = RpcUtil.execute_remote_method(data[1], 'get_item', kwargs = {
-                    'driveid' : data[2],
-                    'item_driveid' : data[3],
-                    'item_id' : data[4],
-                    'include_download_info' : True
-                })
-                '''
                 headers['location'] = item['download_info']['url']
             except Exception as e:
                 httpex = ExceptionUtils.extract_exception(e, HTTPError)
@@ -68,7 +58,15 @@ class Download(BaseHandler):
                     code = 500
                 content.write(ExceptionUtils.full_stacktrace(e))
         else:
-            code = 400
-            content.write('Not enough parameters')
+            code = 404
         self.write_response(code, content=content, headers=headers)
         
+class DownloadServiceUtil(object):
+    @staticmethod
+    def build_download_url(addonid, driveid, item_driveid, item_id, name):
+        return 'http://%s:%s/%s/%s/%s/%s/%s/%s' % (
+            DownloadService._interface,
+            KodiUtils.get_service_port(DownloadService.name, 'script.module.clouddrive.common'),
+            DownloadService.name,
+            addonid, driveid, item_driveid, item_id, name
+        )

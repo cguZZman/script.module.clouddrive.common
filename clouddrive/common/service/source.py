@@ -1,24 +1,21 @@
-'''
-    OneDrive for Kodi
-    Copyright (C) 2015 - Carlos Guzman
-
-    This program is free software; you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation; either version 2 of the License, or
-    (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License along
-    with this program; if not, write to the Free Software Foundation, Inc.,
-    51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
-
-    Created on Mar 1, 2015
-    @author: Carlos Guzman (cguZZman) carlosguzmang@hotmail.com
-'''
+#-------------------------------------------------------------------------------
+# Copyright (C) 2017 Carlos Guzman (cguZZman) carlosguzmang@protonmail.com
+# 
+# This file is part of Cloud Drive Common Module for Kodi
+# 
+# Cloud Drive Common Module for Kodi is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+# 
+# Cloud Drive Common Module for Kodi is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+# 
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#-------------------------------------------------------------------------------
 
 import urllib
 from urllib2 import HTTPError
@@ -26,9 +23,10 @@ from urllib2 import HTTPError
 from clouddrive.common.exception import ExceptionUtils
 from clouddrive.common.html import XHTML
 from clouddrive.common.service.base import BaseService, BaseHandler
-from clouddrive.common.service.utils import RpcUtil
 from clouddrive.common.ui.utils import KodiUtils
 from clouddrive.common.utils import Utils
+from clouddrive.common.service.rpc import RpcUtil
+from clouddrive.common.ui.logger import Logger
 
 
 class SourceService(BaseService):
@@ -208,27 +206,34 @@ class Source(BaseHandler):
         return item['download_info']['url']
         
     def do_GET(self):
-        try:
-            parts = self.path.split('/')
-            addon_name = parts[1]
-            if addon_name:
-                size = len(parts)
-                if size == 2 or (size == 3 and not parts[2]):
-                    self.show_drives(addon_name)
+        data = self.path.split('/')
+        size = len(data)
+        if size > 1 and data[1] == self.server.service.name:
+            try:
+                if size == 2:
+                    self.write_response(303, headers={'location': self.path + '/'})
+                elif size > 2 and data[2]:
+                    addon_name = data[2]
+                    if size == 3:
+                        self.write_response(303, headers={'location': self.path + '/'})
+                    elif size == 4 and not data[3]:
+                        self.show_drives(addon_name)
+                    else:
+                        drive_name = data[3]
+                        path = self.path[len(self.server.service.name)+len(addon_name)+len(drive_name)+3:]
+                        self.process_path(addon_name, drive_name, path)
                 else:
-                    drive_name = parts[2]
-                    path = self.path[len(addon_name)+len(drive_name)+2:]
-                    self.process_path(addon_name, drive_name, path)
-            else:
-                self.show_addon_list()
-        except Exception as e:
-            httpex = ExceptionUtils.extract_exception(e, HTTPError)
-            if httpex:
-                response_code = httpex.code
-            else:
-                response_code = 500
-            content = Utils.get_file_buffer()
-            content.write(ExceptionUtils.full_stacktrace(e))
-            self.write_response(response_code, content=content)
+                    self.show_addon_list()
+            except Exception as e:
+                httpex = ExceptionUtils.extract_exception(e, HTTPError)
+                if httpex:
+                    response_code = httpex.code
+                else:
+                    response_code = 500
+                content = Utils.get_file_buffer()
+                content.write(ExceptionUtils.full_stacktrace(e))
+                self.write_response(response_code, content=content)
+        else:
+            self.write_response(404)
             
         

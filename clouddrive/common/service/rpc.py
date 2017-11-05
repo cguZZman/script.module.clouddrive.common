@@ -1,32 +1,33 @@
-'''
-    OneDrive for Kodi
-    Copyright (C) 2015 - Carlos Guzman
-
-    This program is free software; you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation; either version 2 of the License, or
-    (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License along
-    with this program; if not, write to the Free Software Foundation, Inc.,
-    51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
-
-    Created on Mar 1, 2015
-    @author: Carlos Guzman (cguZZman) carlosguzmang@hotmail.com
-'''
+#-------------------------------------------------------------------------------
+# Copyright (C) 2017 Carlos Guzman (cguZZman) carlosguzmang@protonmail.com
+# 
+# This file is part of Cloud Drive Common Module for Kodi
+# 
+# Cloud Drive Common Module for Kodi is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+# 
+# Cloud Drive Common Module for Kodi is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+# 
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#-------------------------------------------------------------------------------
 
 import inspect
-
-from clouddrive.common.ui.logger import Logger
-from clouddrive.common.service.base import BaseService, BaseHandler
-from clouddrive.common.utils import Utils
-from clouddrive.common.exception import ExceptionUtils
 from urllib2 import HTTPError
+
+from clouddrive.common.exception import ExceptionUtils
+from clouddrive.common.service.base import BaseService, BaseHandler
+from clouddrive.common.ui.logger import Logger
+from clouddrive.common.utils import Utils
+import uuid
+from clouddrive.common.remote.request import Request
+from clouddrive.common.ui.utils import KodiUtils
+
 
 class RpcService(BaseService):
     name = 'rpc'
@@ -37,26 +38,30 @@ class RpcService(BaseService):
 class RpcHandler(BaseHandler):
     def do_POST(self):
         content = Utils.get_file_buffer()
-        try:
-            size = int(self.headers.getheader('content-length', 0))
-            cmd = eval(self.rfile.read(size))
-            method = Utils.get_safe_value(cmd, 'method')
-            if method:
-                code = 200
-                args = Utils.get_safe_value(cmd, 'args', [])
-                kwargs = Utils.get_safe_value(cmd, 'kwargs', {})
-                Logger.debug('Command received:\n%s' % cmd)
-                content.write(repr(self.server.data.rpc(method, args, kwargs)))
-            else:
-                code = 400
-                content.write('Method required')
-        except Exception as e:
-            httpex = ExceptionUtils.extract_exception(e, HTTPError)
-            if httpex:
-                code = httpex.code
-            else:
-                code = 500
-            content.write(ExceptionUtils.full_stacktrace(e))
+        data = self.path.split('/')
+        if len(data) > 1 and data[1] == self.server.service.name:
+            try:
+                size = int(self.headers.getheader('content-length', 0))
+                cmd = eval(self.rfile.read(size))
+                method = Utils.get_safe_value(cmd, 'method')
+                if method:
+                    code = 200
+                    args = Utils.get_safe_value(cmd, 'args', [])
+                    kwargs = Utils.get_safe_value(cmd, 'kwargs', {})
+                    Logger.debug('Command received:\n%s' % cmd)
+                    content.write(repr(self.server.data.rpc(method, args, kwargs)))
+                else:
+                    code = 400
+                    content.write('Method required')
+            except Exception as e:
+                httpex = ExceptionUtils.extract_exception(e, HTTPError)
+                if httpex:
+                    code = httpex.code
+                else:
+                    code = 500
+                content.write(ExceptionUtils.full_stacktrace(e))
+        else:
+            code = 404
         self.write_response(code, content=content)
         
 
@@ -69,28 +74,20 @@ class RemoteProcessCallable(object):
             if name in kwargs:
                 fkwargs[name] = kwargs[name]
         return method(*args, **fkwargs)
+
+class RpcUtil(object):
     
-    '''
-    def on_execute_method(self, exec_id, method, args='[]', kwargs='{}'):
-        Logger.notice('now on_execute_method %s...' % method)
-        home_window = KodiUtils.get_window(10000)
-        key = '%s-%s' % (self._addonid, exec_id)
-        status_key = '%s.status' % key
-        result_key = '%s.result' % key
-        try:
-            home_window.setProperty(status_key, 'in-progress')
-            args = eval(args)
-            kwargs = eval(kwargs)
-            method = getattr(self, method)
-            fkwargs = {}
-            for name in inspect.getargspec(method)[0]:
-                if name in kwargs:
-                    fkwargs[name] = kwargs[name]
-            home_window.setProperty(result_key, repr(method(*args, **fkwargs)))
-            home_window.setProperty(status_key, 'success')
-        except Exception as e:
-            home_window.setProperty(result_key, repr(e))
-            home_window.setProperty(status_key, 'fail')
-            raise e
-    '''
-        
+    @staticmethod
+    def rpc(addonid, method, args=None, kwargs=None, request_id=None):
+        if not request_id:
+            request_id = str(uuid.uuid4())
+        cmd = {'method': method}
+        if args:
+            cmd.update({'args': args})
+        if kwargs:
+            cmd.update({'kwargs': kwargs})
+        cmd = repr(cmd)
+        result = eval(Request('http://%s:%s/%s' % (RpcService._interface, KodiUtils.get_service_port(RpcService.name, addonid), RpcService.name),
+            cmd, {'content-length': len(cmd), 'request-id': request_id}, tries=1).request()
+        )
+        return result
