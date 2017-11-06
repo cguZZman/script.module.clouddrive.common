@@ -105,3 +105,7 @@ class KodiUtils:
     @staticmethod
     def log(msg, level):
         xbmc.log('[%s][%s-%s]: %s' % (KodiUtils.get_addon_info('id'), threading.current_thread().name,threading.current_thread().ident, msg), level)
+
+    @staticmethod
+    def translate_path(path):
+        return xbmc.translatePath(path)

@@ -108,7 +108,7 @@ class BaseHandler(BaseHTTPRequestHandler):
             if content:
                 shutil.copyfileobj(content, self.wfile)
                 content.close()
-            Logger.notice('[%s] response code: %s, length: %s' % (request_id, code, length))
+            Logger.debug('[%s] response code: %s, length: %s' % (request_id, code, length))
     
     def send_response(self, code, message=None):
         if self.response_code_sent:

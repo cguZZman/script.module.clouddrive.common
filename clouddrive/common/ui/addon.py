@@ -81,6 +81,7 @@ class CloudDriveAddon(RemoteProcessCallable):
         self._addon_url = sys.argv[0]
         self._addon_version = self._addon.getAddonInfo('version')
         self._common_addon = xbmcaddon.Addon('script.module.clouddrive.common')
+        self._common_addon_version = self._common_addon.getAddonInfo('version')
         self._dialog = xbmcgui.Dialog()
         self._profile_path = Utils.unicode(xbmc.translatePath(self._addon.getAddonInfo('profile')))
         self._progress_dialog = DialogProgress(self._addon_name)
@@ -124,11 +125,11 @@ class CloudDriveAddon(RemoteProcessCallable):
         return self._system_monitor.abortRequested() or self._progress_dialog.iscanceled() or self._cancel_operation
 
     def _get_display_name(self, account, drive):
-        display = account['name']
+        display = '[B]%s[/B]' % Utils.unicode(account['name'])
         if 'type' in drive and drive['type']:
             display += ' | ' + self.get_provider().get_drive_type_name(drive['type'])
         if 'name' in drive and drive['name']:
-            display += ' | ' + drive['name']
+            display += ' | ' + Utils.unicode(drive['name'])
         return display
     
     def get_accounts(self):
@@ -190,7 +191,7 @@ class CloudDriveAddon(RemoteProcessCallable):
 
         tokens_info = {}
         request_params['on_complete'] = lambda request: self._progress_dialog_bg.close()
-        self._progress_dialog.update(100, self._common_addon.getLocalizedString(32009) % Signin._signin_url, self._common_addon.getLocalizedString(32010) % pin_info['pin'])
+        self._progress_dialog.update(100, self._common_addon.getLocalizedString(32009) % '[B]%s[/B]' % Signin._signin_url, self._common_addon.getLocalizedString(32010) % '[B][COLOR lime]%s[/COLOR][/B]' % pin_info['pin'])
         max_waiting_time = time.time() + self._DEFAULT_SIGNIN_TIMEOUT
         while not self.cancel_operation() and max_waiting_time > time.time():
             remaining = round(max_waiting_time-time.time())
@@ -208,7 +209,7 @@ class CloudDriveAddon(RemoteProcessCallable):
         if not tokens_info:
             raise Exception('Unable to retrieve the auth2 tokens')
         
-        self._progress_dialog.update(60, self._common_addon.getLocalizedString(32064))
+        self._progress_dialog.update(25, self._common_addon.getLocalizedString(32064),' ',' ')
         try:
             account = provider.get_account(request_params = request_params, access_tokens = tokens_info)
         except Exception as e:
@@ -216,7 +217,7 @@ class CloudDriveAddon(RemoteProcessCallable):
         if self.cancel_operation():
             return
         
-        self._progress_dialog.update(90, self._common_addon.getLocalizedString(32017))
+        self._progress_dialog.update(50, self._common_addon.getLocalizedString(32017))
         try:
             account['drives'] = provider.get_drives(request_params = request_params, access_tokens = tokens_info)
         except Exception as e:
@@ -224,12 +225,30 @@ class CloudDriveAddon(RemoteProcessCallable):
         if self.cancel_operation():
             return
         
-        self._progress_dialog.update(95, self._common_addon.getLocalizedString(32020))
+        self._progress_dialog.update(75, self._common_addon.getLocalizedString(32020))
         try:
             account['access_tokens'] = tokens_info
             self._account_manager.add_account(account)
         except Exception as e:
             raise UIException(32021, e)
+        if self.cancel_operation():
+            return
+        
+        self._progress_dialog.update(90)
+        try:
+            accounts = self._account_manager.load()
+            for drive in account['drives']:
+                driveid = drive['id']
+                Logger.debug('Looking for account %s...' % driveid)
+                if driveid in accounts:
+                    drive = accounts[driveid]['drives'][0]
+                    Logger.debug(drive)
+                    if drive['id'] == driveid and drive['type'] == 'migrated':
+                        Logger.debug('Account %s removed.' % driveid)
+                        self._account_manager.remove_account(driveid)
+                        
+        except Exception as e:
+            pass
         if self.cancel_operation():
             return
         
@@ -247,7 +266,7 @@ class CloudDriveAddon(RemoteProcessCallable):
     def _remove_account(self, driveid):
         self._account_manager.load()
         account = self._account_manager.get_account_by_driveid(driveid)
-        if self._dialog.yesno(self._addon_name, self._common_addon.getLocalizedString(32022) % account['name'], None):
+        if self._dialog.yesno(self._addon_name, self._common_addon.getLocalizedString(32022) % Utils.unicode(account['name']), None):
             self._account_manager.remove_account(account['id'])
         xbmc.executebuiltin('Container.Refresh')
         
@@ -258,13 +277,13 @@ class CloudDriveAddon(RemoteProcessCallable):
         if drive_folders:
             listing = []
             url = self._addon_url + '?' + urllib.urlencode({'action':'_list_folder', 'path': '/', 'content_type': self._content_type, 'driveid': driveid})
-            listing.append((url, xbmcgui.ListItem(self.get_my_files_menu_name()), True))
+            listing.append((url, xbmcgui.ListItem('[B]%s[/B]' % self.get_my_files_menu_name()), True))
             for folder in drive_folders:
                 params = {'action':'_list_folder', 'path': folder['path'], 'content_type': self._content_type, 'driveid': driveid}
                 if 'params' in folder:
                     params.update(folder['params'])
                 url = self._addon_url + '?' + urllib.urlencode(params)
-                list_item = xbmcgui.ListItem(folder['name'])
+                list_item = xbmcgui.ListItem(Utils.unicode(folder['name']))
                 if 'context_options' in folder:
                     list_item.addContextMenuItems(folder['context_options'])
                 listing.append((url, list_item, True))
@@ -295,7 +314,7 @@ class CloudDriveAddon(RemoteProcessCallable):
         listing = []
         for item in items:
             item_id = item['id']
-            item_name = item['name']
+            item_name = Utils.unicode(item['name'])
             item_name_extension = item['name_extension']
             item_driveid = Utils.default(Utils.get_safe_value(item, 'drive_id'), driveid)
             list_item = xbmcgui.ListItem(item_name)
@@ -328,7 +347,7 @@ class CloudDriveAddon(RemoteProcessCallable):
                     list_item.setIconImage(item['thumbnail'])
                     list_item.setThumbnailImage(item['thumbnail'])
             elif 'image' in item and self._content_type == 'image' and item_name_extension != 'mp4':
-                url = DownloadServiceUtil.build_download_url(self._addonid, driveid, item_driveid, item_id, urllib.quote(item_name))
+                url = DownloadServiceUtil.build_download_url(self._addonid, driveid, item_driveid, item_id, urllib.quote(Utils.str(item_name)))
                 list_item.setInfo('pictures', item['image'])
                 if 'thumbnail' in item:
                     list_item.setIconImage(item['thumbnail'])
@@ -418,7 +437,7 @@ class CloudDriveAddon(RemoteProcessCallable):
                 if self.cancel_operation():
                     return
                 self._exporting_target = int(item['folder']['child_count']) + 1
-                folder_name = Utils.unicode(item['name']).encode('ascii', 'ignore')
+                folder_name = Utils.ascii(item['name'])
                 folder_path = export_folder + folder_name + '/'
                 if self._addon.getSetting('clean_folder') != 'true' or not xbmcvfs.exists(folder_path) or xbmcvfs.rmdir(folder_path, True):
                     self._exporting = True
@@ -431,7 +450,7 @@ class CloudDriveAddon(RemoteProcessCallable):
                 self._dialog.ok(self._addon_name, export_folder + ' ' + self._common_addon.getLocalizedString(32026))
     
     def __export_folder(self, driveid, folder, export_folder):
-        folder_name = Utils.unicode(folder['name']).encode('ascii', 'ignore')
+        folder_name = Utils.ascii(folder['name'])
         folder_path = os.path.join(os.path.join(export_folder, folder_name), '')
         if not xbmcvfs.exists(folder_path):
             try:
@@ -480,16 +499,16 @@ class CloudDriveAddon(RemoteProcessCallable):
         elif 'video' in item:
             list_item.addStreamInfo('video', item['video'])
         list_item.select(True)
-        list_item.setPath(DownloadServiceUtil.build_download_url(self._addonid, driveid, item_driveid, item_id, urllib.quote(file_name)))
+        list_item.setPath(DownloadServiceUtil.build_download_url(self._addonid, driveid, item_driveid, item_id, urllib.quote(Utils.str(file_name))))
         list_item.setProperty('mimetype', Utils.get_safe_value(item, 'mimetype'))
         if find_subtitles and 'subtitles' in item:
             subtitles = []
             for subtitle in item['subtitles']:
-                subtitles.append(DownloadServiceUtil.build_download_url(self._addonid, driveid, Utils.default(Utils.get_safe_value(subtitle, 'drive_id'), driveid), subtitle['id'], urllib.quote(subtitle['name'])))
+                subtitles.append(DownloadServiceUtil.build_download_url(self._addonid, driveid, Utils.default(Utils.get_safe_value(subtitle, 'drive_id'), driveid), subtitle['id'], urllib.quote(Utils.str(subtitle['name']))))
             list_item.setSubtitles(subtitles)
         xbmcplugin.setResolvedUrl(self._addon_handle, True, list_item)
     
-    def _handle_exception(self, ex):
+    def _handle_exception(self, ex, show_error_dialog = True):
         stacktrace = ExceptionUtils.full_stacktrace(ex)
         rex = ExceptionUtils.extract_exception(ex, RequestException)
         uiex = ExceptionUtils.extract_exception(ex, UIException)
@@ -505,8 +524,6 @@ class CloudDriveAddon(RemoteProcessCallable):
         elif rex and rex.response:
             line1 += ' ' + Utils.unicode(rex)
             line2 = ExceptionUtils.extract_error_message(rex.response)
-        
-        show_error_dialog = True
         send_report = self._common_addon.getSetting('report_error') == 'true'
         add_account_cmd = 'RunPlugin('+self._addon_url + '?' + urllib.urlencode({'action':'_add_account', 'content_type': self._content_type})+')'
         if isinstance(ex, AccountNotFoundException) or isinstance(ex, DriveNotFoundException):
@@ -518,25 +535,26 @@ class CloudDriveAddon(RemoteProcessCallable):
                 line1 = self._common_addon.getLocalizedString(32035)
                 line3 = self._common_addon.getLocalizedString(32038)
             elif httpex.code >= 400:
-                driveid = self._addon_params['driveid']
-                self._account_manager.load()
-                account = self._account_manager.get_account_by_driveid(driveid)
-                drive = self._account_manager.get_drive_by_driveid(driveid)
-                if Signin._signin_url in rex.request or httpex.code == 401:
-                    send_report = False
-                    show_error_dialog = False
-                    if self._dialog.yesno(self._addon_name, self._common_addon.getLocalizedString(32046) % (self._get_display_name(account, drive), '\n')):
-                        xbmc.executebuiltin(add_account_cmd)
-                elif httpex.code == 403:
-                    line1 = self._common_addon.getLocalizedString(32019)
-                    line2 = line3 = None
-                elif httpex.code == 404:
-                    line1 = self._common_addon.getLocalizedString(32037)
-                    line2 = line2 = None
-                else:
-                    line1 = self._common_addon.getLocalizedString(32036)
-                    line3 = self._common_addon.getLocalizedString(32038)
-        report = '[%s] [%s]\n\n%s\n%s\n%s\n\n%s' % (self._addonid, self._addon_version, line1, line2, line3, stacktrace)
+                driveid = Utils.get_safe_value(self._addon_params, 'driveid')
+                if driveid:
+                    self._account_manager.load()
+                    account = self._account_manager.get_account_by_driveid(driveid)
+                    drive = self._account_manager.get_drive_by_driveid(driveid)
+                    if Signin._signin_url in rex.request or httpex.code == 401:
+                        send_report = False
+                        show_error_dialog = False
+                        if self._dialog.yesno(self._addon_name, self._common_addon.getLocalizedString(32046) % (self._get_display_name(account, drive), '\n')):
+                            xbmc.executebuiltin(add_account_cmd)
+                    elif httpex.code == 403:
+                        line1 = self._common_addon.getLocalizedString(32019)
+                        line2 = line3 = None
+                    elif httpex.code == 404:
+                        line1 = self._common_addon.getLocalizedString(32037)
+                        line2 = line2 = None
+                    else:
+                        line1 = self._common_addon.getLocalizedString(32036)
+                        line3 = self._common_addon.getLocalizedString(32038)
+        report = '[%s] [%s]/[%s]\n\n%s\n%s\n%s\n\n%s' % (self._addonid, self._addon_version, self._common_addon_version, line1, line2, line3, stacktrace)
         if rex:
             report += '\n\n%s\nResponse:\n%s' % (rex.request, rex.response)
         report += '\n\nshow_error_dialog: %s' % show_error_dialog
@@ -553,11 +571,16 @@ class CloudDriveAddon(RemoteProcessCallable):
     
     def _open_common_settings(self):
         self._common_addon.openSettings()
+    
+    def _rename_action(self):
+        pass
         
     def route(self):
         try:
+            Logger.debug(self._addon_params)
             self._action = Utils.get_safe_value(self._addon_params, 'action')
             if self._action:
+                self._rename_action()
                 method = getattr(self, self._action)
                 arguments = {}
                 for name in inspect.getargspec(method)[0]:
