@@ -118,7 +118,7 @@ class CloudDriveAddon(RemoteProcessCallable):
     def get_folder_items(self, driveid, item_driveid=None, item_id=None, path=None, on_items_page_completed=None):
         raise NotImplementedError()
     
-    def search(self, query, driveid, item_driveid=None, item_id=None, before_pagination=None):
+    def search(self, query, driveid, item_driveid=None, item_id=None, on_items_page_completed=None):
         raise NotImplementedError()
     
     def cancel_operation(self):
