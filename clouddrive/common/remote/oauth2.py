@@ -81,7 +81,7 @@ class OAuth2(object):
             access_tokens = self.get_access_tokens()
         self._validate_access_tokens(access_tokens, url, data, request_headers)
         if time.time() > (access_tokens['date'] + access_tokens['expires_in']):
-            access_tokens = self.refresh_access_tokens(request_params)
+            access_tokens.update(self.refresh_access_tokens(request_params))
             self._validate_access_tokens(access_tokens, 'refresh_access_tokens', 'Unknown', 'Unknown')
             self.persist_access_tokens(access_tokens)
         request_headers['authorization'] = 'bearer ' + access_tokens['access_token']
