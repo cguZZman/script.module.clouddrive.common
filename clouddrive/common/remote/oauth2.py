@@ -84,7 +84,7 @@ class OAuth2(object):
             access_tokens.update(self.refresh_access_tokens(request_params))
             self._validate_access_tokens(access_tokens, 'refresh_access_tokens', 'Unknown', 'Unknown')
             self.persist_access_tokens(access_tokens)
-        request_headers['authorization'] = 'bearer ' + access_tokens['access_token']
+        request_headers['authorization'] = 'Bearer ' + access_tokens['access_token']
         return Request(url, data, request_headers, **request_params).request_json()
     
     def get(self, path, **kwargs):
