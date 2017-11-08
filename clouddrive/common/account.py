@@ -19,6 +19,7 @@
 
 import json
 import os
+from clouddrive.common.ui.utils import KodiUtils
 
 
 class AccountManager(object):
@@ -34,7 +35,7 @@ class AccountManager(object):
             try:
                 os.makedirs(addon_data_path)
             except:
-                self.monitor.waitForAbort(3)
+                KodiUtils.get_system_monitor().waitForAbort(3)
                 os.makedirs(addon_data_path)
 
     def load(self):
