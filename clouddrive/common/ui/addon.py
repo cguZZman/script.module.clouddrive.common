@@ -61,6 +61,7 @@ class CloudDriveAddon(RemoteProcessCallable):
     _exporting_target = 0
     _exporting_percent = 0
     _exporting_count = 0
+    _load_display = True
     _load_target = 0
     _load_count = 0
     _profile_path = None
@@ -301,10 +302,11 @@ class CloudDriveAddon(RemoteProcessCallable):
             self._progress_dialog_bg.update(100, self._addon_name, self._common_addon.getLocalizedString(32048) % Utils.str(self._load_count))
             
     def _list_folder(self, driveid, item_driveid=None, item_id=None, path=None):
-        item = self.get_item(driveid, item_driveid, item_id, path)
-        if item:
-            self._load_target = item['folder']['child_count']
-            self._progress_dialog_bg.create(self._addon_name, self._common_addon.getLocalizedString(32049) % Utils.str(self._load_target))
+        if self._load_display:
+            item = self.get_item(driveid, item_driveid, item_id, path)
+            if item:
+                self._load_target = item['folder']['child_count']
+                self._progress_dialog_bg.create(self._addon_name, self._common_addon.getLocalizedString(32049) % Utils.str(self._load_target))
         items = self.get_folder_items(driveid, item_driveid, item_id, path, on_items_page_completed = self.on_items_page_completed)
         if self.cancel_operation():
             return
@@ -349,7 +351,7 @@ class CloudDriveAddon(RemoteProcessCallable):
             elif 'image' in item and self._content_type == 'image' and item_name_extension != 'mp4':
                 url = DownloadServiceUtil.build_download_url(self._addonid, driveid, item_driveid, item_id, urllib.quote(Utils.str(item_name)))
                 list_item.setInfo('pictures', item['image'])
-                if 'thumbnail' in item:
+                if 'thumbnail' in item and item['thumbnail']:
                     list_item.setIconImage(item['thumbnail'])
                     list_item.setThumbnailImage(item['thumbnail'])
             if url:
