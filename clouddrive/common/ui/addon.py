@@ -62,6 +62,7 @@ class CloudDriveAddon(RemoteProcessCallable):
     _exporting_percent = 0
     _exporting_count = 0
     _child_count_supported = True
+    _auto_refreshed_slideshow_supported = True
     _load_target = 0
     _load_count = 0
     _profile_path = None
@@ -333,7 +334,7 @@ class CloudDriveAddon(RemoteProcessCallable):
                 if self._content_type == 'audio' or self._content_type == 'video':
                     params['action'] = '_export_folder'
                     context_options.append((self._common_addon.getLocalizedString(32004), 'RunPlugin('+self._addon_url + '?' + urllib.urlencode(params)+')'))
-                elif self._content_type == 'image':
+                elif self._content_type == 'image' and self._auto_refreshed_slideshow_supported:
                     params['action'] = '_slideshow'
                     context_options.append((self._common_addon.getLocalizedString(32032), 'RunPlugin('+self._addon_url + '?' + urllib.urlencode(params)+')'))
                 list_item.addContextMenuItems(context_options)
@@ -369,29 +370,30 @@ class CloudDriveAddon(RemoteProcessCallable):
                 return
             self._process_items(items, driveid)
     
-    def _slideshow(self, driveid, item_driveid=None, item_id=None, path=None, old_child_count=0):
+    def new_change_token_slideshow(self, change_token, driveid, item_driveid=None, item_id=None, path=None):
         item = self.get_item(driveid, item_driveid, item_id, path)
         if self.cancel_operation():
             return
-        if item:
-            wait_for_slideshow = False
-            child_count = item['folder']['child_count']
-            if old_child_count != child_count:
-                if child_count >= 0:
-                    Logger.debug('Slideshow child count changed. Refreshing slideshow...')
-                params = {'action':'_list_folder', 'content_type': self._content_type,
-                          'item_driveid': Utils.default(item_driveid, ''), 'item_id': Utils.default(item_id, ''), 'driveid': driveid, 'path' : Utils.default(path, ''),
-                          'child_count': child_count}
-                extra_params = ',recursive' if self._addon.getSetting('slideshow_recursive') == 'true' else ''
-                xbmc.executebuiltin('SlideShow('+self._addon_url + '?' + urllib.urlencode(params) + extra_params + ')')
-                wait_for_slideshow = True
-            else:
-                Logger.debug('Slideshow child count is the same, nothing to refresh...')
-            t = threading.Thread(target=self._refresh_slideshow, args=(driveid, item_driveid, item_id, path, child_count, wait_for_slideshow,))
-            t.setDaemon(True)
-            t.start()
+        return item['folder']['child_count']
     
-    def _refresh_slideshow(self, driveid, item_driveid, item_id, path, child_count, wait_for_slideshow):
+    def _slideshow(self, driveid, item_driveid=None, item_id=None, path=None, change_token=None):
+        new_change_token = self.new_change_token_slideshow(change_token, driveid, item_driveid, item_id, path)
+        if self.cancel_operation():
+            return
+        wait_for_slideshow = False
+        if not change_token or change_token != new_change_token:
+            params = {'action':'_list_folder', 'content_type': self._content_type,
+                      'item_driveid': Utils.default(item_driveid, ''), 'item_id': Utils.default(item_id, ''), 'driveid': driveid, 'path' : Utils.default(path, '')}
+            extra_params = ',recursive' if self._addon.getSetting('slideshow_recursive') == 'true' else ''
+            xbmc.executebuiltin('SlideShow('+self._addon_url + '?' + urllib.urlencode(params) + extra_params + ')')
+            wait_for_slideshow = True
+        else:
+            Logger.debug('Slideshow child count is the same, nothing to refresh...')
+        t = threading.Thread(target=self._refresh_slideshow, args=(driveid, item_driveid, item_id, path, new_change_token, wait_for_slideshow,))
+        t.setDaemon(True)
+        t.start()
+    
+    def _refresh_slideshow(self, driveid, item_driveid, item_id, path, change_token, wait_for_slideshow):
         if wait_for_slideshow:
             Logger.debug('Waiting up to 10 minutes until the slideshow for folder %s starts...' % Utils.default(item_id, path))
             max_waiting_time = time.time() + 10 * 60
@@ -408,11 +410,11 @@ class CloudDriveAddon(RemoteProcessCallable):
         self._print_slideshow_info()
         if not self.cancel_operation() and xbmc.getCondVisibility('Slideshow.IsActive'):
             try:
-                self._slideshow(driveid, item_driveid, item_id, path, child_count)
+                self._slideshow(driveid, item_driveid, item_id, path, change_token)
             except Exception as e:
                 Logger.error('Slideshow failed to auto refresh. Will be restarted when possible. Error: ')
                 Logger.error(ExceptionUtils.full_stacktrace(e))
-                self._refresh_slideshow(driveid, item_driveid, item_id, path, -1, wait_for_slideshow)
+                self._refresh_slideshow(driveid, item_driveid, item_id, path, None, wait_for_slideshow)
         else:
             Logger.notice('Slideshow is not running anymore or abort requested.')
         
