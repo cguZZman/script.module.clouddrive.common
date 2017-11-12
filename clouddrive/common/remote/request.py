@@ -70,6 +70,25 @@ class Request(object):
         self.waiting_retry = waiting_retry
         self.wait = wait
     
+    def get_url_for_report(self, url):
+        index = url.find('access_token=')
+        if index > -1:
+            url_report = url[:index + 13] + '*removed*'
+            index = url.find('&', index + 1)
+            if index > -1:
+                url_report += url[index:]
+            return url_report
+        return url
+    
+    def get_headers_for_report(self, headers):
+        headers_report = {}
+        for header in headers:
+            if header == 'authorization':
+                headers_report[header] = '*removed*'
+            else:
+                headers_report[header] = headers[header]
+        return headers_report
+    
     def request(self):
         self.response_text = self._DEFAULT_RESPONSE
         if not self.exceptions:
@@ -85,9 +104,9 @@ class Request(object):
                 self.before_request(self)
             if self.cancel_operation and self.cancel_operation():
                 break
-            request_report = 'Request URL: ' + Utils.str(self.url)
+            request_report = 'Request URL: ' + self.get_url_for_report(self.url)
             request_report += '\nRequest data: ' + Utils.str(self.data)
-            request_report += '\nRequest headers: ' + Utils.str(self.headers)
+            request_report += '\nRequest headers: ' + Utils.str(self.get_headers_for_report(self.headers))
             response_report = '<response_not_set>'
             response = None
             try:
