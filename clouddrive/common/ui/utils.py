@@ -18,12 +18,13 @@
 #-------------------------------------------------------------------------------
 
 import json
+from threading import Lock
 import threading
 import time
 import urllib
-import dateutil.parser
 
 from clouddrive.common.utils import Utils
+import dateutil.parser
 import xbmc
 import xbmcaddon
 import xbmcgui
@@ -34,6 +35,7 @@ class KodiUtils:
     LOGNOTICE = xbmc.LOGNOTICE
     LOGERROR = xbmc.LOGERROR
     LOGWARNING = xbmc.LOGWARNING
+    lock = Lock()
     
     @staticmethod
     def get_addon(addonid=None):
@@ -97,12 +99,17 @@ class KodiUtils:
         return info
     
     @staticmethod
-    def get_server_service_port():
-        return KodiUtils.get_service_port('server', 'script.module.clouddrive.common')
-    
-    @staticmethod
     def get_service_port(service, addonid=None):
-        return KodiUtils.get_addon_setting('%s.service.port' % service, addonid)
+        KodiUtils.lock.acquire()
+        port = KodiUtils.get_addon_setting('%s.service.port' % service, addonid)
+        KodiUtils.lock.release()
+        return port
+
+    @staticmethod
+    def set_service_port(service, port, addonid=None):
+        KodiUtils.lock.acquire()
+        KodiUtils.set_addon_setting('%s.service.port' % service, Utils.str(port), addonid)
+        KodiUtils.lock.release()
     
     @staticmethod
     def log(msg, level):

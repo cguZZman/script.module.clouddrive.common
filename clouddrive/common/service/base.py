@@ -50,7 +50,7 @@ class BaseService(object):
     
     def start(self):
         port = self.get_port()
-        KodiUtils.set_addon_setting(self.name + '.service.port', str(port))
+        KodiUtils.set_service_port(self.name, port)
         self._server = BaseServer((self._interface, port), self._handler, self, self.data)
         Logger.notice('Service \'%s\' started in port %s' % (self.name, port))
         self._server.serve_forever()
