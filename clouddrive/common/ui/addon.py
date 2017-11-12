@@ -126,13 +126,14 @@ class CloudDriveAddon(RemoteProcessCallable):
     def cancel_operation(self):
         return self._system_monitor.abortRequested() or self._progress_dialog.iscanceled() or self._cancel_operation
 
-    def _get_display_name(self, account, drive, with_format):
+    def _get_display_name(self, account, drive=None, with_format=False):
         s = '[B]%s[/B]' if with_format else '%s'
         display = s % Utils.unicode(account['name'])
-        if 'type' in drive and drive['type']:
-            display += ' | ' + self.get_provider().get_drive_type_name(drive['type'])
-        if 'name' in drive and drive['name']:
-            display += ' | ' + Utils.unicode(drive['name'])
+        if drive:
+            if 'type' in drive and drive['type']:
+                display += ' | ' + self.get_provider().get_drive_type_name(drive['type'])
+            if 'name' in drive and drive['name']:
+                display += ' | ' + Utils.unicode(drive['name'])
         return display
     
     def get_accounts(self, with_format=False):
@@ -144,7 +145,7 @@ class CloudDriveAddon(RemoteProcessCallable):
         return accounts
                     
     def list_accounts(self):
-        accounts = self.get_accounts(True)
+        accounts = self.get_accounts(with_format=True)
         listing = []
         for account_id in accounts:
             account = accounts[account_id]
@@ -262,16 +263,16 @@ class CloudDriveAddon(RemoteProcessCallable):
         self._account_manager.load()
         account = self._account_manager.get_account_by_driveid(driveid)
         drive = self._account_manager.get_drive_by_driveid(driveid)
-        if self._dialog.yesno(self._addon_name, self._common_addon.getLocalizedString(32023) % self._get_display_name(account, drive), None):
+        if self._dialog.yesno(self._addon_name, self._common_addon.getLocalizedString(32023) % self._get_display_name(account, drive, True), None):
             self._account_manager.remove_drive(driveid)
-        xbmc.executebuiltin('Container.Refresh')
+            xbmc.executebuiltin('Container.Refresh')
     
     def _remove_account(self, driveid):
         self._account_manager.load()
         account = self._account_manager.get_account_by_driveid(driveid)
-        if self._dialog.yesno(self._addon_name, self._common_addon.getLocalizedString(32022) % Utils.unicode(account['name']), None):
+        if self._dialog.yesno(self._addon_name, self._common_addon.getLocalizedString(32022) % self._get_display_name(account, None, True), None):
             self._account_manager.remove_account(account['id'])
-        xbmc.executebuiltin('Container.Refresh')
+            xbmc.executebuiltin('Container.Refresh')
         
     def _list_drive(self, driveid):
         drive_folders = self.get_custom_drive_folders(driveid)
@@ -554,7 +555,7 @@ class CloudDriveAddon(RemoteProcessCallable):
                     if Signin._signin_url in rex.request or httpex.code == 401:
                         send_report = False
                         show_error_dialog = False
-                        if self._dialog.yesno(self._addon_name, self._common_addon.getLocalizedString(32046) % (self._get_display_name(account, drive), '\n')):
+                        if self._dialog.yesno(self._addon_name, self._common_addon.getLocalizedString(32046) % (self._get_display_name(account, drive, True), '\n')):
                             xbmc.executebuiltin(add_account_cmd)
                     elif httpex.code == 403:
                         line1 = self._common_addon.getLocalizedString(32019)
