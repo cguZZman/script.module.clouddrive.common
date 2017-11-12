@@ -126,24 +126,25 @@ class CloudDriveAddon(RemoteProcessCallable):
     def cancel_operation(self):
         return self._system_monitor.abortRequested() or self._progress_dialog.iscanceled() or self._cancel_operation
 
-    def _get_display_name(self, account, drive):
-        display = '[B]%s[/B]' % Utils.unicode(account['name'])
+    def _get_display_name(self, account, drive, with_format):
+        s = '[B]%s[/B]' if with_format else '%s'
+        display = s % Utils.unicode(account['name'])
         if 'type' in drive and drive['type']:
             display += ' | ' + self.get_provider().get_drive_type_name(drive['type'])
         if 'name' in drive and drive['name']:
             display += ' | ' + Utils.unicode(drive['name'])
         return display
     
-    def get_accounts(self):
+    def get_accounts(self, with_format=False):
         accounts = self._account_manager.load()
         for account_id in accounts:
             account = accounts[account_id]
             for drive in account['drives']:
-                drive['display_name'] = self._get_display_name(account, drive)
+                drive['display_name'] = self._get_display_name(account, drive, with_format)
         return accounts
                     
     def list_accounts(self):
-        accounts = self.get_accounts()
+        accounts = self.get_accounts(True)
         listing = []
         for account_id in accounts:
             account = accounts[account_id]
@@ -382,27 +383,28 @@ class CloudDriveAddon(RemoteProcessCallable):
             return
         wait_for_slideshow = False
         if not change_token or change_token != new_change_token:
+            Logger.notice('Slideshow will start. change_token: %s, new_change_token: %s' % (change_token, new_change_token))
             params = {'action':'_list_folder', 'content_type': self._content_type,
                       'item_driveid': Utils.default(item_driveid, ''), 'item_id': Utils.default(item_id, ''), 'driveid': driveid, 'path' : Utils.default(path, '')}
             extra_params = ',recursive' if self._addon.getSetting('slideshow_recursive') == 'true' else ''
             xbmc.executebuiltin('SlideShow('+self._addon_url + '?' + urllib.urlencode(params) + extra_params + ')')
             wait_for_slideshow = True
         else:
-            Logger.debug('Slideshow child count is the same, nothing to refresh...')
+            Logger.notice('Slideshow child count is the same, nothing to refresh...')
         t = threading.Thread(target=self._refresh_slideshow, args=(driveid, item_driveid, item_id, path, new_change_token, wait_for_slideshow,))
         t.setDaemon(True)
         t.start()
     
     def _refresh_slideshow(self, driveid, item_driveid, item_id, path, change_token, wait_for_slideshow):
         if wait_for_slideshow:
-            Logger.debug('Waiting up to 10 minutes until the slideshow for folder %s starts...' % Utils.default(item_id, path))
+            Logger.notice('Waiting up to 10 minutes until the slideshow for folder %s starts...' % Utils.default(item_id, path))
             max_waiting_time = time.time() + 10 * 60
             while not self.cancel_operation() and not xbmc.getCondVisibility('Slideshow.IsActive') and max_waiting_time > time.time():
                 if self._system_monitor.waitForAbort(2):
                     break
             self._print_slideshow_info()
         interval = self._addon.getSetting('slideshow_refresh_interval')
-        Logger.debug('Waiting up to %s minute(s) to check if it is needed to refresh the slideshow of folder %s...' % (interval, Utils.default(item_id, path)))
+        Logger.notice('Waiting up to %s minute(s) to check if it is needed to refresh the slideshow of folder %s...' % (interval, Utils.default(item_id, path)))
         target_time = time.time() + int(interval) * 60
         while not self.cancel_operation() and target_time > time.time() and xbmc.getCondVisibility('Slideshow.IsActive'):
             if self._system_monitor.waitForAbort(10):

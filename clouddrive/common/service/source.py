@@ -103,7 +103,7 @@ class Source(BaseHandler):
     def show_addon_list(self):
         html, table = self.open_table('Index of /')
         for addon in self.get_cloud_drive_addons():
-            self.add_row(table, addon['name'] + '/')
+            self.add_row(table, Utils.str(addon['name']) + '/')
         self.close_table(table)
         response = Utils.get_file_buffer()
         response.write(str(html))
@@ -122,7 +122,7 @@ class Source(BaseHandler):
         addons = self.get_cloud_drive_addons()
         addonid = None
         for addon in addons:
-            if addon['name'] == addon_name:
+            if urllib.quote(Utils.str(addon['name'])) == addon_name:
                 addonid = addon['addonid']
                 break
         return addonid
@@ -130,9 +130,8 @@ class Source(BaseHandler):
     def get_driveid(self, addonid, drive_name):
         driveid = None
         drives = self.get_drive_list(addonid)
-        drive_name = urllib.unquote(drive_name)
         for drive in drives:
-            if drive['display_name'] == drive_name:
+            if urllib.quote(Utils.str(drive['display_name'])) == drive_name:
                 driveid = drive['id']
                 break
         return driveid
@@ -146,7 +145,7 @@ class Source(BaseHandler):
             self.add_row(table, '../')
             drives = self.get_drive_list(addonid)
             for drive in drives:
-                self.add_row(table, drive['display_name'] + '/')
+                self.add_row(table, Utils.str(drive['display_name']) + '/')
             self.close_table(table)
         else:
             response_code = 404
@@ -192,7 +191,7 @@ class Source(BaseHandler):
             file_name = Utils.str(item['name'])
             if 'folder' in item:
                 file_name += '/'
-            date = Utils.default(Utils.get_safe_value(item, 'last_modified_date'), '  - ')
+            date = Utils.default(self.date_time_string(KodiUtils.to_timestamp(Utils.get_safe_value(item, 'last_modified_date'))), '  - ')
             size = self.get_size(Utils.default(Utils.get_safe_value(item, 'size'), -1))
             description = Utils.default(Utils.get_safe_value(item, 'description'), '&nbsp;')
             self.add_row(table, file_name, date, size, description)

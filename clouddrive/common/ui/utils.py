@@ -19,7 +19,9 @@
 
 import json
 import threading
+import time
 import urllib
+import dateutil.parser
 
 from clouddrive.common.utils import Utils
 import xbmc
@@ -109,3 +111,11 @@ class KodiUtils:
     @staticmethod
     def translate_path(path):
         return xbmc.translatePath(path)
+    
+    @staticmethod
+    def to_timestamp(s):
+        try:
+            return int(time.mktime(dateutil.parser.parse(s).timetuple()))
+        except:
+            return None
+    
