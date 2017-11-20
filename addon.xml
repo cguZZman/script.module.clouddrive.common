@@ -16,5 +16,6 @@
 		<license>GNU GENERAL PUBLIC LICENSE. Version 3, 29 June 2007</license>
 		<source>https://github.com/cguZZman/script.module.clouddrive.common</source>
 		<forum>https://github.com/cguZZman/script.module.clouddrive.common/issues</forum>
+		<news>v1.0.0 - Nov 6, 2017: First release</news>
 	</extension>
 </addon>
