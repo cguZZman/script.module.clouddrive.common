@@ -41,6 +41,7 @@ import xbmcgui
 import xbmcplugin
 import xbmcvfs
 from clouddrive.common.service.download import DownloadServiceUtil
+from clouddrive.common.ui.utils import KodiUtils
 
 
 class CloudDriveAddon(RemoteProcessCallable):
@@ -82,7 +83,8 @@ class CloudDriveAddon(RemoteProcessCallable):
         self._addon_name = self._addon.getAddonInfo('name')
         self._addon_url = sys.argv[0]
         self._addon_version = self._addon.getAddonInfo('version')
-        self._common_addon = xbmcaddon.Addon('script.module.clouddrive.common')
+        self._common_addon_id = 'script.module.clouddrive.common'
+        self._common_addon = xbmcaddon.Addon(self._common_addon_id)
         self._common_addon_version = self._common_addon.getAddonInfo('version')
         self._dialog = xbmcgui.Dialog()
         self._profile_path = Utils.unicode(xbmc.translatePath(self._addon.getAddonInfo('profile')))
@@ -536,7 +538,7 @@ class CloudDriveAddon(RemoteProcessCallable):
         elif rex and rex.response:
             line1 += ' ' + Utils.unicode(rex)
             line2 = ExceptionUtils.extract_error_message(rex.response)
-        send_report = self._common_addon.getSetting('report_error') == 'true'
+        send_report = True
         add_account_cmd = 'RunPlugin('+self._addon_url + '?' + urllib.urlencode({'action':'_add_account', 'content_type': self._content_type})+')'
         if isinstance(ex, AccountNotFoundException) or isinstance(ex, DriveNotFoundException):
             show_error_dialog = False
@@ -571,10 +573,16 @@ class CloudDriveAddon(RemoteProcessCallable):
             report += '\n\n%s\nResponse:\n%s' % (rex.request, rex.response)
         report += '\n\nshow_error_dialog: %s' % show_error_dialog
         Logger.error(report)
-        if send_report:
-            self._send_report(report)
         if show_error_dialog:
             self._dialog.ok(self._addon_name, line1, line2, line3)
+        if send_report:
+            report_error = KodiUtils.get_addon_setting('report_error', self._common_addon_id) == 'true'
+            report_error_invite = KodiUtils.get_addon_setting('report_error_invite', self._common_addon_id) == 'true'
+            if not report_error and not report_error_invite:
+                if not self._dialog.yesno(self._addon_name, self._common_addon.getLocalizedString(32050), None, None, self._common_addon.getLocalizedString(32012), self._common_addon.getLocalizedString(32013)):
+                    KodiUtils.set_addon_setting('report_error', 'true', self._common_addon_id)
+                KodiUtils.set_addon_setting('report_error_invite', 'true', self._common_addon_id)
+            self._send_report(report)
     
     def _send_report(self, report):
         t = threading.Thread(target=ErrorReport().send_report, args=(report,))
