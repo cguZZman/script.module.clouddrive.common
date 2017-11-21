@@ -25,6 +25,7 @@ import urllib2
 from clouddrive.common.exception import ExceptionUtils, RequestException
 from clouddrive.common.remote.request import Request
 from clouddrive.common.utils import Utils
+import json
 
 
 class OAuth2(object):
@@ -71,21 +72,26 @@ class OAuth2(object):
             url += '?' + parameters
         return url
     
-    def request(self, method, path, parameters={}, request_params={}, access_tokens={}):
+    def request(self, method, path, parameters={}, request_params={}, access_tokens={}, headers=None):
         encoded_parameters = urllib.urlencode(parameters)
         url = self._build_url(method, path, encoded_parameters)
         self._wrap_on_exception(request_params)
-        data = None if method == 'get' else encoded_parameters
-        request_headers = Utils.default(self._get_request_headers(), {})
+        if not headers:
+            headers = Utils.default(self._get_request_headers(), {})
+        content_type = Utils.get_safe_value(headers, 'content-type', '')
+        if content_type == 'application/json':
+            data = json.dumps(parameters)
+        else:
+            data = None if method == 'get' else encoded_parameters
         if not access_tokens:
             access_tokens = self.get_access_tokens()
-        self._validate_access_tokens(access_tokens, url, data, request_headers)
+        self._validate_access_tokens(access_tokens, url, data, headers)
         if time.time() > (access_tokens['date'] + access_tokens['expires_in']):
             access_tokens.update(self.refresh_access_tokens(request_params))
             self._validate_access_tokens(access_tokens, 'refresh_access_tokens', 'Unknown', 'Unknown')
             self.persist_access_tokens(access_tokens)
-        request_headers['authorization'] = 'Bearer ' + access_tokens['access_token']
-        return Request(url, data, request_headers, **request_params).request_json()
+        headers['authorization'] = 'Bearer ' + access_tokens['access_token']
+        return Request(url, data, headers, **request_params).request_json()
     
     def get(self, path, **kwargs):
         return self.request('get', path, **kwargs)

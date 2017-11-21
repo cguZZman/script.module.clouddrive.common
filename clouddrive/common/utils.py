@@ -83,3 +83,10 @@ class Utils:
     @staticmethod
     def get_file_buffer():
         return StringIO()
+    
+    @staticmethod
+    def get_parent_path(path):
+        index = path.rfind('/')
+        if index > -1:
+            return path[:index]
+        return ''
