@@ -25,7 +25,7 @@ from clouddrive.common.ui.utils import KodiUtils
 
 
 class Signin(object):
-    _signin_url = 'https://kodi-login.herokuapp.com'
+    _signin_url = 'https://drive-login.herokuapp.com'
     
     def get_addon_header(self):
         return '%s %s/%s' % (KodiUtils.get_addon_info('id'), KodiUtils.get_addon_info('version'), KodiUtils.get_addon_info('version', 'script.module.clouddrive.common'))
