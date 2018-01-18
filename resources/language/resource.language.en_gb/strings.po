@@ -270,7 +270,7 @@ msgid "Allow cloud drive addons to be used as a source"
 msgstr ""
 
 msgctxt "#32069"
-msgid "     Source server port  -  http://localhost:<port>"
+msgid "     Source server port  -  http://localhost:<port>/source"
 msgstr ""
 
 msgctxt "#32070"

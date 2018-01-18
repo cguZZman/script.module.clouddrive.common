@@ -266,8 +266,8 @@ msgid "Allow %s addon to be used as a source"
 msgstr "אפשר להשתמש בהרחבה %s כמקור"
 
 msgctxt "#32069"
-msgid "     Source server port  -  http://localhost:<port>"
-msgstr "     מקור יציאת שרת  -  http://localhost:<port>"
+msgid "     Source server port  -  http://localhost:<port>/source"
+msgstr "     מקור יציאת שרת  -  http://localhost:<port>/source"
 
 msgctxt "#32070"
 msgid "There are no accounts added in %s."
