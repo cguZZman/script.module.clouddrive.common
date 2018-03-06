@@ -114,14 +114,13 @@ class CloudDriveAddon(RemoteProcessCallable):
                     self._content_type = 'image'
                 else:
                     self._content_type = 'video'
-        
-        xbmcplugin.addSortMethod(handle=self._addon_handle, sortMethod=xbmcplugin.SORT_METHOD_NONE )
-        xbmcplugin.addSortMethod(handle=self._addon_handle, sortMethod=xbmcplugin.SORT_METHOD_UNSORTED ) 
-        xbmcplugin.addSortMethod(handle=self._addon_handle, sortMethod=xbmcplugin.SORT_METHOD_LABEL)
-        xbmcplugin.addSortMethod(handle=self._addon_handle, sortMethod=xbmcplugin.SORT_METHOD_FILE )
-        xbmcplugin.addSortMethod(handle=self._addon_handle, sortMethod=xbmcplugin.SORT_METHOD_SIZE )
-        xbmcplugin.addSortMethod(handle=self._addon_handle, sortMethod=xbmcplugin.SORT_METHOD_DATE )
-        xbmcplugin.addSortMethod(handle=self._addon_handle, sortMethod=xbmcplugin.SORT_METHOD_DURATION )
+            xbmcplugin.addSortMethod(handle=self._addon_handle, sortMethod=xbmcplugin.SORT_METHOD_NONE )
+            xbmcplugin.addSortMethod(handle=self._addon_handle, sortMethod=xbmcplugin.SORT_METHOD_UNSORTED ) 
+            xbmcplugin.addSortMethod(handle=self._addon_handle, sortMethod=xbmcplugin.SORT_METHOD_LABEL)
+            xbmcplugin.addSortMethod(handle=self._addon_handle, sortMethod=xbmcplugin.SORT_METHOD_FILE )
+            xbmcplugin.addSortMethod(handle=self._addon_handle, sortMethod=xbmcplugin.SORT_METHOD_SIZE )
+            xbmcplugin.addSortMethod(handle=self._addon_handle, sortMethod=xbmcplugin.SORT_METHOD_DATE )
+            xbmcplugin.addSortMethod(handle=self._addon_handle, sortMethod=xbmcplugin.SORT_METHOD_DURATION )
     
     def get_provider(self):
         raise NotImplementedError()
@@ -341,10 +340,11 @@ class CloudDriveAddon(RemoteProcessCallable):
             url = None
             is_folder = 'folder' in item
             params = {'content_type': self._content_type, 'item_driveid': item_driveid, 'item_id': item_id, 'driveid': driveid}
+            context_options = []
             if is_folder:
                 params['action'] = '_list_folder'
                 url = self._addon_url + '?' + urllib.urlencode(params)
-                context_options = []
+                
                 params['action'] = '_search'
                 cmd = 'ActivateWindow(%d,%s?%s)' % (xbmcgui.getCurrentWindowId(), self._addon_url, urllib.urlencode(params))
                 context_options.append((self._common_addon.getLocalizedString(32039), cmd))
@@ -354,7 +354,6 @@ class CloudDriveAddon(RemoteProcessCallable):
                 elif self._content_type == 'image' and self._auto_refreshed_slideshow_supported:
                     params['action'] = '_slideshow'
                     context_options.append((self._common_addon.getLocalizedString(32032), 'RunPlugin('+self._addon_url + '?' + urllib.urlencode(params)+')'))
-                list_item.addContextMenuItems(context_options)
             elif (('video' in item or item_name_extension in self._video_file_extensions) and self._content_type == 'video') or (('audio' in item or item_name_extension in self._audio_file_extensions) and self._content_type == 'audio'):
                 list_item.setProperty('IsPlayable', 'true')
                 params['action'] = 'play'
@@ -374,11 +373,16 @@ class CloudDriveAddon(RemoteProcessCallable):
                     list_item.setIconImage(item['thumbnail'])
                     list_item.setThumbnailImage(item['thumbnail'])
             if url:
+                context_options.extend(self.get_context_options(list_item, params, is_folder))
+                list_item.addContextMenuItems(context_options)
                 list_item.setProperty('mimetype', Utils.get_safe_value(item, 'mimetype'))
                 listing.append((url, list_item, is_folder))
         xbmcplugin.addDirectoryItems(self._addon_handle, listing, len(listing))
         xbmcplugin.endOfDirectory(self._addon_handle, True)
     
+    def get_context_options(self, list_item, params, is_folder):
+        return []
+        
     def _search(self, driveid, item_driveid=None, item_id=None):
         query = self._dialog.input(self._addon_name + ' - ' + self._common_addon.getLocalizedString(32042))
         if query:
@@ -517,6 +521,9 @@ class CloudDriveAddon(RemoteProcessCallable):
                 self._exporting_percent = p
             self._export_progress_dialog_bg.update(self._exporting_percent, self._addon_name + ' ' + self._common_addon.getLocalizedString(32024), file_path[len(base_export_folder):])        
     
+    def _get_item_play_url(self, file_name, driveid, item_driveid=None, item_id=None):
+        return DownloadServiceUtil.build_download_url(self._addonid, driveid, item_driveid, item_id, urllib.quote(Utils.str(file_name)))
+    
     def play(self, driveid, item_driveid=None, item_id=None):
         find_subtitles = self._addon.getSetting('set_subtitle') == 'true' and self._content_type == 'video'
         item = self.get_item(driveid, item_driveid, item_id, find_subtitles=find_subtitles)
@@ -527,7 +534,7 @@ class CloudDriveAddon(RemoteProcessCallable):
         elif 'video' in item:
             list_item.addStreamInfo('video', item['video'])
         list_item.select(True)
-        list_item.setPath(DownloadServiceUtil.build_download_url(self._addonid, driveid, item_driveid, item_id, urllib.quote(Utils.str(file_name))))
+        list_item.setPath(self._get_item_play_url(file_name, driveid, item_driveid, item_id))
         list_item.setProperty('mimetype', Utils.get_safe_value(item, 'mimetype'))
         if find_subtitles and 'subtitles' in item:
             subtitles = []

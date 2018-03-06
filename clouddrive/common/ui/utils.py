@@ -53,6 +53,10 @@ class KodiUtils:
         return xbmcgui.Window(window_id)
     
     @staticmethod
+    def get_current_window_id():
+        return xbmcgui.getCurrentWindowId()
+    
+    @staticmethod
     def execute_json_rpc(method, params=None, request_id=1):
         cmd = {'jsonrpc': '2.0', 'method': method, 'id': request_id}
         if params:
@@ -70,6 +74,24 @@ class KodiUtils:
         if params:
             url += '?%s' % urllib.urlencode(params)
         cmd = 'RunPlugin(%s)' % url
+        xbmc.executebuiltin(cmd, wait)
+        
+    @staticmethod
+    def activate_window(addon_url, window_id=None, params=None, wait=False):
+        if not window_id:
+            window_id = KodiUtils.get_current_window_id()
+        if params:
+            addon_url += '?%s' % urllib.urlencode(params)
+        cmd = 'ActivateWindow(%d,%s)' % (window_id, addon_url)
+        xbmc.executebuiltin(cmd, wait)
+        
+    @staticmethod
+    def replace_window(addon_url, window_id=None, params=None, wait=False):
+        if not window_id:
+            window_id = KodiUtils.get_current_window_id()
+        if params:
+            addon_url += '?%s' % urllib.urlencode(params)
+        cmd = 'ReplaceWindow(%d,%s)' % (window_id, addon_url)
         xbmc.executebuiltin(cmd, wait)
     
     @staticmethod
