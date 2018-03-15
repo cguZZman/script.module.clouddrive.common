@@ -72,7 +72,8 @@ class CloudDriveAddon(RemoteProcessCallable):
     _export_progress_dialog_bg = None
     _system_monitor = None
     _video_file_extensions = ['mkv', 'mp4', 'avi', 'iso', 'nut', 'ogg', 'vivo', 'pva', 'nuv', 'nsv', 'nsa', 'fli', 'flc', 'wtv', 'flv']
-    _audio_file_extensions = ['mp3', 'wav', 'flac', 'alac', 'aiff', 'amr', 'ape', 'shn', 's3m', 'nsf', 'spc']
+    _audio_file_extensions = ['mp3', 'wav', 'flac', 'alac', 'aiff', 'amr', 'ape', 'shn', 's3m', 'nsf', 'spc', 'm4a', 'm4b', 'mpc', 'sln', 
+                              'tta', 'vox', 'wv', 'webm', 'wma', '3gp', 'aa', 'aac', 'aax', 'act', 'flac', 'gsm']
     _image_file_extensions = ['ani', 'anim', 'apng', 'art', 'bmp', 'bpg', 'bsave', 'cal', 'cin', 'cpc', 'cpt', 'dds', 'dpx', 'ecw', 'exr',
                               'fits', 'flic', 'flif', 'fpx', 'gif', 'hdri', 'hevc', 'icer', 'icns', 'ico', 'cur', 'ics', 'ilbm', 'jbig', 'jbig2',
                               'jng', 'jpeg', 'jpg', 'xr', 'kra', 'mng', 'miff', 'nrrd', 'ora', 'pam', 'pbm', 'pgm', 'ppm', 'pnm', 'pcx', 'pgf',
@@ -466,7 +467,7 @@ class CloudDriveAddon(RemoteProcessCallable):
                 if self._child_count_supported:
                     self._exporting_target = int(item['folder']['child_count'])
                 self._exporting_target += 1
-                folder_name = Utils.ascii(item['name'])
+                folder_name = Utils.unicode(item['name'])
                 folder_path = export_folder + folder_name + '/'
                 if self._addon.getSetting('clean_folder') != 'true' or not xbmcvfs.exists(folder_path) or xbmcvfs.rmdir(folder_path, True):
                     self._exporting = True
@@ -479,7 +480,7 @@ class CloudDriveAddon(RemoteProcessCallable):
                 self._dialog.ok(self._addon_name, export_folder + ' ' + self._common_addon.getLocalizedString(32026))
     
     def __export_folder(self, driveid, folder, export_folder):
-        folder_name = Utils.ascii(folder['name'])
+        folder_name = Utils.unicode(folder['name'])
         folder_path = os.path.join(os.path.join(export_folder, folder_name), '')
         if not xbmcvfs.exists(folder_path):
             try:
@@ -501,13 +502,13 @@ class CloudDriveAddon(RemoteProcessCallable):
         base_export_folder = self._addon.getSetting(string_config)
         for item in items:
             is_folder = 'folder' in item
-            item_name = Utils.ascii(item['name'])
+            item_name = Utils.unicode(item['name'])
             item_name_extension = item['name_extension']
             file_path = os.path.join(folder_path, item_name)
             if is_folder:
                 self.__export_folder(driveid, item, folder_path)
             elif (('video' in item or item_name_extension in self._video_file_extensions) and self._content_type == 'video') or ('audio' in item and self._content_type == 'audio'):
-                item_id = Utils.ascii(item['id'])
+                item_id = Utils.str(item['id'])
                 item_drive_id = Utils.default(Utils.get_safe_value(item, 'drive_id'), driveid)
                 params = {'action':'play', 'content_type': self._content_type, 'item_driveid': item_drive_id, 'item_id': item_id, 'driveid': driveid}
                 url = self._addon_url + '?' + urllib.urlencode(params)
