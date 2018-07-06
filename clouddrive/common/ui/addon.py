@@ -341,6 +341,8 @@ class CloudDriveAddon(RemoteProcessCallable):
             url = None
             is_folder = 'folder' in item
             params = {'content_type': self._content_type, 'item_driveid': item_driveid, 'item_id': item_id, 'driveid': driveid}
+            if 'extra_params' in item:
+                params.update(item['extra_params'])
             context_options = []
             if is_folder:
                 params['action'] = '_list_folder'
@@ -367,7 +369,10 @@ class CloudDriveAddon(RemoteProcessCallable):
                     list_item.setIconImage(item['thumbnail'])
                     list_item.setThumbnailImage(item['thumbnail'])
             elif ('image' in item or item_name_extension in self._image_file_extensions) and self._content_type == 'image' and item_name_extension != 'mp4':
-                url = DownloadServiceUtil.build_download_url(self._addonid, driveid, item_driveid, item_id, urllib.quote(Utils.str(item_name)))
+                if 'url' in item:
+                    url = item['url']
+                else:
+                    url = DownloadServiceUtil.build_download_url(self._addonid, driveid, item_driveid, item_id, urllib.quote(Utils.str(item_name)))
                 if 'image' in item:
                     list_item.setInfo('pictures', item['image'])
                 if 'thumbnail' in item and item['thumbnail']:
