@@ -73,7 +73,11 @@ class RemoteProcessCallable(object):
         for name in inspect.getargspec(method)[0]:
             if name in kwargs:
                 fkwargs[name] = kwargs[name]
-        return method(*args, **fkwargs)
+        try:
+            return method(*args, **fkwargs)
+        except Exception as ex:
+            self._handle_exception(ex, False)
+            raise ex
 
 class RpcUtil(object):
     

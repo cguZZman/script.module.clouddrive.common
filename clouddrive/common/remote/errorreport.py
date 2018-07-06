@@ -24,7 +24,7 @@ from clouddrive.common.ui.utils import KodiUtils
 
 
 class ErrorReport(object):
-    _report_url = 'https://kodi-login.herokuapp.com/report'
+    _report_url = 'https://drive-login.herokuapp.com/report'
     def send_report(self, report):
         if KodiUtils.get_addon_setting('report_error', 'script.module.clouddrive.common') == 'true':
             Request(self._report_url, urllib.urlencode({'stacktrace' : report})).request()
