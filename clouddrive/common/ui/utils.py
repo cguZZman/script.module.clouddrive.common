@@ -22,6 +22,7 @@ from threading import Lock
 import threading
 import time
 import urllib
+from clouddrive.common.utils import Utils
 
 class KodiUtils:
     LOGDEBUG = 0
@@ -159,7 +160,7 @@ class KodiUtils:
     
     @staticmethod
     def get_cache_expiration_time(addonid=None):
-        return int(KodiUtils.get_addon_setting('cache-expiration-time', addonid))
+        return int(Utils.default(KodiUtils.get_addon_setting('cache-expiration-time', addonid), '5'))
     
     @staticmethod
     def log(msg, level):
