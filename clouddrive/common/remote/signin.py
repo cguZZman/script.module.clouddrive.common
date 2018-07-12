@@ -22,24 +22,27 @@ import urllib
 
 from clouddrive.common.remote.request import Request
 from clouddrive.common.ui.utils import KodiUtils
+from clouddrive.common.utils import Utils
 
 
 class Signin(object):
-    _signin_url = 'https://drive-login.herokuapp.com'
     
     def get_addon_header(self):
         return '%s %s/%s' % (KodiUtils.get_addon_info('id'), KodiUtils.get_addon_info('version'), KodiUtils.get_addon_info('version', 'script.module.clouddrive.common'))
     
-    def create_pin(self, provider_name, request_params={}):
+    def create_pin(self, provider_name, request_params=None):
+        request_params = Utils.default(request_params, {})
         headers = {'addon' : self.get_addon_header()}
         body = urllib.urlencode({'provider': provider_name})
-        return Request(self._signin_url + '/pin', body, headers, **request_params).request_json()
+        return Request(KodiUtils.get_signin_server() + '/pin', body, headers, **request_params).request_json()
     
-    def fetch_tokens_info(self, pin_info, request_params={}):
+    def fetch_tokens_info(self, pin_info, request_params=None):
+        request_params = Utils.default(request_params, {})
         headers = {'authorization': 'Basic ' + base64.b64encode(':' + pin_info['password']), 'addon' : self.get_addon_header()}
-        return Request(self._signin_url + '/pin/' + pin_info['pin'], None, headers, **request_params).request_json()
+        return Request(KodiUtils.get_signin_server() + '/pin/' + pin_info['pin'], None, headers, **request_params).request_json()
 
-    def refresh_tokens(self, provider_name, refresh_token, request_params={}):
+    def refresh_tokens(self, provider_name, refresh_token, request_params=None):
+        request_params = Utils.default(request_params, {})
         headers = {'addon' : self.get_addon_header()}
         body = urllib.urlencode({'provider': provider_name, 'refresh_token': refresh_token})
-        return Request(self._signin_url + '/refresh', body, headers, **request_params).request_json()
+        return Request(KodiUtils.get_signin_server() + '/refresh', body, headers, **request_params).request_json()

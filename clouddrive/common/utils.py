@@ -17,11 +17,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #-------------------------------------------------------------------------------
 
-try:
-    from cStringIO import StringIO
-except ImportError:
-    from StringIO import StringIO
-    
+
 class Utils:
     @staticmethod
     def get_extension(name):
@@ -82,6 +78,11 @@ class Utils:
     
     @staticmethod
     def get_file_buffer():
+        try:
+            from cStringIO import StringIO
+        except ImportError:
+            from StringIO import StringIO
+            
         return StringIO()
     
     @staticmethod

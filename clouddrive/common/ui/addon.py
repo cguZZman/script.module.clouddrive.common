@@ -30,18 +30,16 @@ from clouddrive.common.account import AccountManager, AccountNotFoundException, 
     DriveNotFoundException
 from clouddrive.common.exception import UIException, ExceptionUtils, RequestException
 from clouddrive.common.remote.errorreport import ErrorReport
-from clouddrive.common.remote.signin import Signin
 from clouddrive.common.service.rpc import RemoteProcessCallable
 from clouddrive.common.ui.dialog import DialogProgress, DialogProgressBG
 from clouddrive.common.ui.logger import Logger
 from clouddrive.common.utils import Utils
-import xbmc
-import xbmcaddon
 import xbmcgui
 import xbmcplugin
 import xbmcvfs
 from clouddrive.common.service.download import DownloadServiceUtil
 from clouddrive.common.ui.utils import KodiUtils
+from clouddrive.common.cache.cache import Cache
 
 
 class CloudDriveAddon(RemoteProcessCallable):
@@ -53,7 +51,6 @@ class CloudDriveAddon(RemoteProcessCallable):
     _addon_params = None
     _addon_url = None
     _addon_version = None
-    _cache = None
     _common_addon = None
     _cancel_operation = False
     _content_type = None
@@ -84,20 +81,20 @@ class CloudDriveAddon(RemoteProcessCallable):
     _action = None
     
     def __init__(self):
-        self._addon = xbmcaddon.Addon()
+        self._addon = KodiUtils.get_addon()
         self._addonid = self._addon.getAddonInfo('id')
         self._addon_name = self._addon.getAddonInfo('name')
         self._addon_url = sys.argv[0]
         self._addon_version = self._addon.getAddonInfo('version')
         self._common_addon_id = 'script.module.clouddrive.common'
-        self._common_addon = xbmcaddon.Addon(self._common_addon_id)
+        self._common_addon = KodiUtils.get_addon(self._common_addon_id)
         self._common_addon_version = self._common_addon.getAddonInfo('version')
         self._dialog = xbmcgui.Dialog()
-        self._profile_path = Utils.unicode(xbmc.translatePath(self._addon.getAddonInfo('profile')))
+        self._profile_path = Utils.unicode(KodiUtils.translate_path(self._addon.getAddonInfo('profile')))
         self._progress_dialog = DialogProgress(self._addon_name)
         self._progress_dialog_bg = DialogProgressBG(self._addon_name)
         self._export_progress_dialog_bg = DialogProgressBG(self._addon_name)
-        self._system_monitor = xbmc.Monitor()
+        self._system_monitor = KodiUtils.get_system_monitor()
         self._account_manager = AccountManager(self._profile_path)
         self._home_window = xbmcgui.Window(10000)
         
@@ -123,6 +120,17 @@ class CloudDriveAddon(RemoteProcessCallable):
             xbmcplugin.addSortMethod(handle=self._addon_handle, sortMethod=xbmcplugin.SORT_METHOD_DATE )
             xbmcplugin.addSortMethod(handle=self._addon_handle, sortMethod=xbmcplugin.SORT_METHOD_DURATION )
     
+    def __del__(self):
+        del self._addon
+        del self._common_addon
+        del self._dialog
+        del self._progress_dialog
+        del self._progress_dialog_bg
+        del self._export_progress_dialog_bg
+        del self._system_monitor
+        del self._account_manager
+        del self._home_window
+        
     def get_provider(self):
         raise NotImplementedError()
     
@@ -132,24 +140,11 @@ class CloudDriveAddon(RemoteProcessCallable):
     def get_custom_drive_folders(self, driveid):
         return
     
-    def get_folder_items(self, driveid, item_driveid=None, item_id=None, path=None, on_items_page_completed=None):
-        raise NotImplementedError()
-    
-    def search(self, query, driveid, item_driveid=None, item_id=None, on_items_page_completed=None):
-        raise NotImplementedError()
-    
     def cancel_operation(self):
         return self._system_monitor.abortRequested() or self._progress_dialog.iscanceled() or self._cancel_operation
 
     def _get_display_name(self, account, drive=None, with_format=False):
-        s = '[B]%s[/B]' if with_format else '%s'
-        display = s % Utils.unicode(account['name'])
-        if drive:
-            if 'type' in drive and drive['type']:
-                display += ' | ' + self.get_provider().get_drive_type_name(drive['type'])
-            if 'name' in drive and drive['name']:
-                display += ' | ' + Utils.unicode(drive['name'])
-        return display
+        return self._account_manager.get_account_display_name(account, drive, self.get_provider(), with_format)
     
     def get_accounts(self, with_format=False):
         accounts = self._account_manager.load()
@@ -210,7 +205,7 @@ class CloudDriveAddon(RemoteProcessCallable):
 
         tokens_info = {}
         request_params['on_complete'] = lambda request: self._progress_dialog_bg.close()
-        self._progress_dialog.update(100, self._common_addon.getLocalizedString(32009) % '[B]%s[/B]' % Signin._signin_url, self._common_addon.getLocalizedString(32010) % '[B][COLOR lime]%s[/COLOR][/B]' % pin_info['pin'])
+        self._progress_dialog.update(100, self._common_addon.getLocalizedString(32009) % '[B]%s[/B]' % KodiUtils.get_signin_server(), self._common_addon.getLocalizedString(32010) % '[B][COLOR lime]%s[/COLOR][/B]' % pin_info['pin'])
         max_waiting_time = time.time() + self._DEFAULT_SIGNIN_TIMEOUT
         while not self.cancel_operation() and max_waiting_time > time.time():
             remaining = round(max_waiting_time-time.time())
@@ -272,7 +267,7 @@ class CloudDriveAddon(RemoteProcessCallable):
             return
         
         self._progress_dialog.close()
-        xbmc.executebuiltin('Container.Refresh')
+        KodiUtils.executebuiltin('Container.Refresh')
     
     def _remove_drive(self, driveid):
         self._account_manager.load()
@@ -280,14 +275,14 @@ class CloudDriveAddon(RemoteProcessCallable):
         drive = self._account_manager.get_drive_by_driveid(driveid)
         if self._dialog.yesno(self._addon_name, self._common_addon.getLocalizedString(32023) % self._get_display_name(account, drive, True), None):
             self._account_manager.remove_drive(driveid)
-            xbmc.executebuiltin('Container.Refresh')
+            KodiUtils.executebuiltin('Container.Refresh')
     
     def _remove_account(self, driveid):
         self._account_manager.load()
         account = self._account_manager.get_account_by_driveid(driveid)
-        if self._dialog.yesno(self._addon_name, self._common_addon.getLocalizedString(32022) % self._get_display_name(account, None, True), None):
+        if self._dialog.yesno(self._addon_name, self._common_addon.getLocalizedString(32022) % self._get_display_name(account, with_format=True), None):
             self._account_manager.remove_account(account['id'])
-            xbmc.executebuiltin('Container.Refresh')
+            KodiUtils.executebuiltin('Container.Refresh')
         
     def _list_drive(self, driveid):
         drive_folders = self.get_custom_drive_folders(driveid)
@@ -320,12 +315,14 @@ class CloudDriveAddon(RemoteProcessCallable):
             self._progress_dialog_bg.update(100, self._addon_name, self._common_addon.getLocalizedString(32048) % Utils.str(self._load_count))
             
     def _list_folder(self, driveid, item_driveid=None, item_id=None, path=None):
+        self.get_provider().configure(self._account_manager, driveid)
         if self._child_count_supported:
-            item = self.get_item(driveid, item_driveid, item_id, path)
+            item = self.get_provider().get_item(item_driveid, item_id, path)
             if item:
                 self._load_target = item['folder']['child_count']
                 self._progress_dialog_bg.create(self._addon_name, self._common_addon.getLocalizedString(32049) % Utils.str(self._load_target))
-        items = self.get_folder_items(driveid, item_driveid, item_id, path, on_items_page_completed = self.on_items_page_completed)
+        
+        items = self.get_provider().get_folder_items(item_driveid, item_id, path, on_items_page_completed = self.on_items_page_completed)
         if self.cancel_operation():
             return
         self._process_items(items, driveid)
@@ -372,7 +369,7 @@ class CloudDriveAddon(RemoteProcessCallable):
                 if 'url' in item:
                     url = item['url']
                 else:
-                    url = DownloadServiceUtil.build_download_url(self._addonid, driveid, item_driveid, item_id, urllib.quote(Utils.str(item_name)))
+                    url = DownloadServiceUtil.build_download_url(driveid, item_driveid, item_id, urllib.quote(Utils.str(item_name)))
                 if 'image' in item:
                     list_item.setInfo('pictures', item['image'])
                 if 'thumbnail' in item and item['thumbnail']:
@@ -390,16 +387,18 @@ class CloudDriveAddon(RemoteProcessCallable):
         return []
         
     def _search(self, driveid, item_driveid=None, item_id=None):
+        self.get_provider().configure(self._account_manager, driveid)
         query = self._dialog.input(self._addon_name + ' - ' + self._common_addon.getLocalizedString(32042))
         if query:
             self._progress_dialog_bg.create(self._addon_name, self._common_addon.getLocalizedString(32041))
-            items = self.search(query, driveid, item_driveid, item_id, on_items_page_completed = self.on_items_page_completed)
+            items = self.get_provider().search(query, item_driveid, item_id, on_items_page_completed = self.on_items_page_completed)
             if self.cancel_operation():
                 return
             self._process_items(items, driveid)
     
     def new_change_token_slideshow(self, change_token, driveid, item_driveid=None, item_id=None, path=None):
-        item = self.get_item(driveid, item_driveid, item_id, path)
+        self.get_provider().configure(self._account_manager, driveid)
+        item = self.get_provider().get_item(item_driveid, item_id, path)
         if self.cancel_operation():
             return
         return item['folder']['child_count']
@@ -414,7 +413,7 @@ class CloudDriveAddon(RemoteProcessCallable):
             params = {'action':'_list_folder', 'content_type': self._content_type,
                       'item_driveid': Utils.default(item_driveid, ''), 'item_id': Utils.default(item_id, ''), 'driveid': driveid, 'path' : Utils.default(path, '')}
             extra_params = ',recursive' if self._addon.getSetting('slideshow_recursive') == 'true' else ''
-            xbmc.executebuiltin('SlideShow('+self._addon_url + '?' + urllib.urlencode(params) + extra_params + ')')
+            KodiUtils.executebuiltin('SlideShow('+self._addon_url + '?' + urllib.urlencode(params) + extra_params + ')')
             wait_for_slideshow = True
         else:
             Logger.notice('Slideshow child count is the same, nothing to refresh...')
@@ -426,18 +425,18 @@ class CloudDriveAddon(RemoteProcessCallable):
         if wait_for_slideshow:
             Logger.notice('Waiting up to 10 minutes until the slideshow for folder %s starts...' % Utils.default(item_id, path))
             max_waiting_time = time.time() + 10 * 60
-            while not self.cancel_operation() and not xbmc.getCondVisibility('Slideshow.IsActive') and max_waiting_time > time.time():
+            while not self.cancel_operation() and not KodiUtils.get_cond_visibility('Slideshow.IsActive') and max_waiting_time > time.time():
                 if self._system_monitor.waitForAbort(2):
                     break
             self._print_slideshow_info()
         interval = self._addon.getSetting('slideshow_refresh_interval')
         Logger.notice('Waiting up to %s minute(s) to check if it is needed to refresh the slideshow of folder %s...' % (interval, Utils.default(item_id, path)))
         target_time = time.time() + int(interval) * 60
-        while not self.cancel_operation() and target_time > time.time() and xbmc.getCondVisibility('Slideshow.IsActive'):
+        while not self.cancel_operation() and target_time > time.time() and KodiUtils.get_cond_visibility('Slideshow.IsActive'):
             if self._system_monitor.waitForAbort(10):
                 break
         self._print_slideshow_info()
-        if not self.cancel_operation() and xbmc.getCondVisibility('Slideshow.IsActive'):
+        if not self.cancel_operation() and KodiUtils.get_cond_visibility('Slideshow.IsActive'):
             try:
                 self._slideshow(driveid, item_driveid, item_id, path, change_token)
             except Exception as e:
@@ -448,12 +447,13 @@ class CloudDriveAddon(RemoteProcessCallable):
             Logger.notice('Slideshow is not running anymore or abort requested.')
         
     def _print_slideshow_info(self):
-        if xbmc.getCondVisibility('Slideshow.IsActive'):
+        if KodiUtils.get_cond_visibility('Slideshow.IsActive'):
             Logger.debug('Slideshow is there...')
         elif self.cancel_operation():
             Logger.debug('Abort requested...')
         
     def _export_folder(self, driveid, item_driveid=None, item_id=None):
+        self.get_provider().configure(self._account_manager, driveid)
         if self._home_window.getProperty(self._addonid + 'exporting'):
             self._dialog.ok(self._addon_name, self._common_addon.getLocalizedString(32059) + ' ' + self._common_addon.getLocalizedString(32038))
         else:
@@ -466,7 +466,7 @@ class CloudDriveAddon(RemoteProcessCallable):
                 self._export_progress_dialog_bg.create(self._addon_name + ' ' + self._common_addon.getLocalizedString(32024), self._common_addon.getLocalizedString(32025))
                 self._export_progress_dialog_bg.update(0)
                 self._addon.setSetting(string_config, export_folder)
-                item = self.get_item(driveid, item_driveid, item_id)
+                item = self.get_provider().get_item(item_driveid, item_id)
                 if self.cancel_operation():
                     return
                 if self._child_count_supported:
@@ -494,7 +494,7 @@ class CloudDriveAddon(RemoteProcessCallable):
                 if self._system_monitor.waitForAbort(3):
                     return
                 xbmcvfs.mkdirs(folder_path)
-        items = self.get_folder_items(driveid, Utils.default(Utils.get_safe_value(folder, 'drive_id'), driveid), folder['id'])
+        items = self.get_provider().get_folder_items(Utils.default(Utils.get_safe_value(folder, 'drive_id'), driveid), folder['id'])
         if self.cancel_operation():
             return
         for item in items:
@@ -528,11 +528,12 @@ class CloudDriveAddon(RemoteProcessCallable):
             self._export_progress_dialog_bg.update(self._exporting_percent, self._addon_name + ' ' + self._common_addon.getLocalizedString(32024), file_path[len(base_export_folder):])        
     
     def _get_item_play_url(self, file_name, driveid, item_driveid=None, item_id=None):
-        return DownloadServiceUtil.build_download_url(self._addonid, driveid, item_driveid, item_id, urllib.quote(Utils.str(file_name)))
+        return DownloadServiceUtil.build_download_url(driveid, item_driveid, item_id, urllib.quote(Utils.str(file_name)))
     
     def play(self, driveid, item_driveid=None, item_id=None):
+        self.get_provider().configure(self._account_manager, driveid)
         find_subtitles = self._addon.getSetting('set_subtitle') == 'true' and self._content_type == 'video'
-        item = self.get_item(driveid, item_driveid, item_id, find_subtitles=find_subtitles)
+        item = self.get_provider().get_item(item_driveid, item_id, find_subtitles=find_subtitles)
         file_name = Utils.unicode(item['name'])
         list_item = xbmcgui.ListItem(file_name)
         if 'audio' in item:
@@ -545,7 +546,7 @@ class CloudDriveAddon(RemoteProcessCallable):
         if find_subtitles and 'subtitles' in item:
             subtitles = []
             for subtitle in item['subtitles']:
-                subtitles.append(DownloadServiceUtil.build_download_url(self._addonid, driveid, Utils.default(Utils.get_safe_value(subtitle, 'drive_id'), driveid), subtitle['id'], urllib.quote(Utils.str(subtitle['name']))))
+                subtitles.append(DownloadServiceUtil.build_download_url(driveid, Utils.default(Utils.get_safe_value(subtitle, 'drive_id'), driveid), subtitle['id'], urllib.quote(Utils.str(subtitle['name']))))
             list_item.setSubtitles(subtitles)
         xbmcplugin.setResolvedUrl(self._addon_handle, True, list_item)
     
@@ -570,7 +571,7 @@ class CloudDriveAddon(RemoteProcessCallable):
         if isinstance(ex, AccountNotFoundException) or isinstance(ex, DriveNotFoundException):
             show_error_dialog = False
             if self._dialog.yesno(self._addon_name, self._common_addon.getLocalizedString(32063) % '\n'):
-                xbmc.executebuiltin(add_account_cmd)
+                KodiUtils.executebuiltin(add_account_cmd)
         elif rex and httpex:
             if httpex.code >= 500:
                 line1 = self._common_addon.getLocalizedString(32035)
@@ -581,15 +582,16 @@ class CloudDriveAddon(RemoteProcessCallable):
                     self._account_manager.load()
                     account = self._account_manager.get_account_by_driveid(driveid)
                     drive = self._account_manager.get_drive_by_driveid(driveid)
-                    if Signin._signin_url in rex.request or httpex.code == 401:
+                    if KodiUtils.get_signin_server() in rex.request or httpex.code == 401:
                         send_report = False
                         show_error_dialog = False
                         if self._dialog.yesno(self._addon_name, self._common_addon.getLocalizedString(32046) % (self._get_display_name(account, drive, True), '\n')):
-                            xbmc.executebuiltin(add_account_cmd)
+                            KodiUtils.executebuiltin(add_account_cmd)
                     elif httpex.code == 403:
                         line1 = self._common_addon.getLocalizedString(32019)
                         line2 = line3 = None
                     elif httpex.code == 404:
+                        send_report = False
                         line1 = self._common_addon.getLocalizedString(32037)
                         line2 = line2 = None
                     else:
@@ -619,6 +621,11 @@ class CloudDriveAddon(RemoteProcessCallable):
     def _open_common_settings(self):
         self._common_addon.openSettings()
     
+    def _clear_cache(self):
+        Cache(self._addonid, 'page', 0).clear()
+        Cache(self._addonid, 'children', 0).clear()
+        Cache(self._addonid, 'items', 0).clear()
+        
     def _rename_action(self):
         pass
         

@@ -32,10 +32,10 @@ class Provider(OAuth2):
     def __init__(self, name):
         self.name = name
         
-    def create_pin(self, request_params={}):
+    def create_pin(self, request_params=None):
         return self._signin.create_pin(self.name, request_params)
     
-    def fetch_tokens_info(self, pin_info, request_params={}):
+    def fetch_tokens_info(self, pin_info, request_params=None):
         tokens_info = self._signin.fetch_tokens_info(pin_info, request_params)
         if tokens_info:
             tokens_info['date'] = time.time()
@@ -57,7 +57,7 @@ class Provider(OAuth2):
         account = self._account_manager.get_account_by_driveid(self._driveid)
         return account['access_tokens']
     
-    def refresh_access_tokens(self, request_params={}):
+    def refresh_access_tokens(self, request_params=None):
         tokens = self.get_access_tokens()
         tokens_info = self._signin.refresh_tokens(self.name, tokens['refresh_token'], request_params)
         if tokens_info:
@@ -71,11 +71,14 @@ class Provider(OAuth2):
         account['access_tokens'] = access_tokens
         self._account_manager.add_account(account)
     
-    def get_account(self, request_params={}, access_tokens={}):
+    def get_account(self, request_params=None, access_tokens=None):
         raise NotImplementedError()
     
-    def get_drives(self, request_params={}, access_tokens={}):
+    def get_drives(self, request_params=None, access_tokens=None):
         raise NotImplementedError()
     
     def get_drive_type_name(self, drive_type):
         return drive_type
+    
+    def cancel_operation(self):
+        return False
