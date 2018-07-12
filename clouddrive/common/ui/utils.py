@@ -63,14 +63,14 @@ class KodiUtils:
         return json.loads(xbmc.executeJSONRPC(json.dumps(cmd)))
     
     @staticmethod
-    def get_cond_visibility(self, cmd):
+    def get_cond_visibility(cmd):
         import xbmc
         xbmc.getCondVisibility(cmd)
         
     @staticmethod
-    def executebuiltin(self, cmd):
+    def executebuiltin(cmd, wait=False):
         import xbmc
-        xbmc.executebuiltin(cmd)
+        xbmc.executebuiltin(cmd, wait)
         
     @staticmethod
     def run_script(addonid, params=None, wait=False):

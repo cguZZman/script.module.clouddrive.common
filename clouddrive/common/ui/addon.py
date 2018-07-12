@@ -40,6 +40,7 @@ import xbmcvfs
 from clouddrive.common.service.download import DownloadServiceUtil
 from clouddrive.common.ui.utils import KodiUtils
 from clouddrive.common.cache.cache import Cache
+from clouddrive.common.remote.request import Request
 
 
 class CloudDriveAddon(RemoteProcessCallable):
@@ -79,6 +80,7 @@ class CloudDriveAddon(RemoteProcessCallable):
     _account_manager = None
     _home_window = None
     _action = None
+    _ip_before_pin = None
     
     def __init__(self):
         self._addon = KodiUtils.get_addon()
@@ -197,6 +199,8 @@ class CloudDriveAddon(RemoteProcessCallable):
         }
         provider = self.get_provider()
         self._progress_dialog.update(0, self._common_addon.getLocalizedString(32008))
+        
+        self._ip_before_pin = Request(KodiUtils.get_signin_server() + '/ip', None).request()
         pin_info = provider.create_pin(request_params)
         if self.cancel_operation():
             return
@@ -597,6 +601,13 @@ class CloudDriveAddon(RemoteProcessCallable):
                     else:
                         line1 = self._common_addon.getLocalizedString(32036)
                         line3 = self._common_addon.getLocalizedString(32038)
+                else:
+                    if KodiUtils.get_signin_server()+'/pin/' in rex.request and httpex.code == 404 and self._ip_before_pin:
+                        ip_after_pin = Request(KodiUtils.get_signin_server() + '/ip', None).request()
+                        if self._ip_before_pin != ip_after_pin:
+                            send_report = False
+                            line1 = self._common_addon.getLocalizedString(32072)
+                            line2 = self._common_addon.getLocalizedString(32073) % (self._ip_before_pin, ip_after_pin,)
         report = '[%s] [%s]/[%s]\n\n%s\n%s\n%s\n\n%s' % (self._addonid, self._addon_version, self._common_addon_version, line1, line2, line3, stacktrace)
         if rex:
             report += '\n\n%s\nResponse:\n%s' % (rex.request, rex.response)
@@ -611,12 +622,7 @@ class CloudDriveAddon(RemoteProcessCallable):
                 if not self._dialog.yesno(self._addon_name, self._common_addon.getLocalizedString(32050), None, None, self._common_addon.getLocalizedString(32012), self._common_addon.getLocalizedString(32013)):
                     KodiUtils.set_addon_setting('report_error', 'true', self._common_addon_id)
                 KodiUtils.set_addon_setting('report_error_invite', 'true', self._common_addon_id)
-            self._send_report(report)
-    
-    def _send_report(self, report):
-        t = threading.Thread(target=ErrorReport().send_report, args=(report,))
-        t.setDaemon(True)
-        t.start()
+            ErrorReport.send_report(report)
     
     def _open_common_settings(self):
         self._common_addon.openSettings()
@@ -640,6 +646,7 @@ class CloudDriveAddon(RemoteProcessCallable):
                 for name in inspect.getargspec(method)[0]:
                     if name in self._addon_params:
                         arguments[name] = self._addon_params[name]
+                Logger.notice(arguments)
                 method(**arguments)
             else:
                 self.list_accounts()

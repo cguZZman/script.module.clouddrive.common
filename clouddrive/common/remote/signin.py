@@ -23,6 +23,8 @@ import urllib
 from clouddrive.common.remote.request import Request
 from clouddrive.common.ui.utils import KodiUtils
 from clouddrive.common.utils import Utils
+from clouddrive.common.exception import ExceptionUtils
+import urllib2
 
 
 class Signin(object):
@@ -36,8 +38,21 @@ class Signin(object):
         body = urllib.urlencode({'provider': provider_name})
         return Request(KodiUtils.get_signin_server() + '/pin', body, headers, **request_params).request_json()
     
-    def fetch_tokens_info(self, pin_info, request_params=None):
+    def _on_exception(self, request, e, original_on_exception):
+        ex = ExceptionUtils.extract_exception(e, urllib2.HTTPError)
+        if ex and ex.code >= 400 and ex.code <= 599 and ex.code != 503:
+            request.tries = request.current_tries
+        if original_on_exception and not(original_on_exception is self._on_exception):
+            original_on_exception(request, e)
+            
+    def _wrap_on_exception(self, request_params=None):
         request_params = Utils.default(request_params, {})
+        original_on_exception = Utils.get_safe_value(request_params, 'on_exception', None)
+        request_params['on_exception'] = lambda request, e: self._on_exception(request, e, original_on_exception)
+        return request_params
+    
+    def fetch_tokens_info(self, pin_info, request_params=None):
+        request_params = self._wrap_on_exception(request_params)
         headers = {'authorization': 'Basic ' + base64.b64encode(':' + pin_info['password']), 'addon' : self.get_addon_header()}
         return Request(KodiUtils.get_signin_server() + '/pin/' + pin_info['pin'], None, headers, **request_params).request_json()
 
