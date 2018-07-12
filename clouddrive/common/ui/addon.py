@@ -69,14 +69,9 @@ class CloudDriveAddon(RemoteProcessCallable):
     _progress_dialog_bg = None
     _export_progress_dialog_bg = None
     _system_monitor = None
-    _video_file_extensions = ['mkv', 'mp4', 'avi', 'iso', 'nut', 'ogg', 'vivo', 'pva', 'nuv', 'nsv', 'nsa', 'fli', 'flc', 'wtv', 'flv']
-    _audio_file_extensions = ['mp3', 'wav', 'flac', 'alac', 'aiff', 'amr', 'ape', 'shn', 's3m', 'nsf', 'spc', 'm4a', 'm4b', 'mpc', 'sln', 
-                              'tta', 'vox', 'wv', 'webm', 'wma', '3gp', 'aa', 'aac', 'aax', 'act', 'flac', 'gsm']
-    _image_file_extensions = ['ani', 'anim', 'apng', 'art', 'bmp', 'bpg', 'bsave', 'cal', 'cin', 'cpc', 'cpt', 'dds', 'dpx', 'ecw', 'exr',
-                              'fits', 'flic', 'flif', 'fpx', 'gif', 'hdri', 'hevc', 'icer', 'icns', 'ico', 'cur', 'ics', 'ilbm', 'jbig', 'jbig2',
-                              'jng', 'jpeg', 'jpg', 'xr', 'kra', 'mng', 'miff', 'nrrd', 'ora', 'pam', 'pbm', 'pgm', 'ppm', 'pnm', 'pcx', 'pgf',
-                              'png', 'psd', 'psb', 'psp', 'qtvr', 'ras', 'rbe', 'tiff', 'sgi', 'tga', 'tiff', 'ufo', 'ufp', 'wbmp', 'webp',
-                              'xbm', 'xcf', 'xpm', 'xwd']
+    _video_file_extensions = KodiUtils.get_supported_media("video")
+    _audio_file_extensions = KodiUtils.get_supported_media("music")
+    _image_file_extensions = KodiUtils.get_supported_media("picture")
     _account_manager = None
     _home_window = None
     _action = None
@@ -367,8 +362,7 @@ class CloudDriveAddon(RemoteProcessCallable):
                 elif 'video' in item:
                     list_item.addStreamInfo('video', item['video'])
                 if 'thumbnail' in item:
-                    list_item.setIconImage(item['thumbnail'])
-                    list_item.setThumbnailImage(item['thumbnail'])
+                    list_item.setArt({'icon': item['thumbnail'], 'thumb': item['thumbnail']})
             elif ('image' in item or item_name_extension in self._image_file_extensions) and self._content_type == 'image' and item_name_extension != 'mp4':
                 if 'url' in item:
                     url = item['url']
@@ -377,8 +371,7 @@ class CloudDriveAddon(RemoteProcessCallable):
                 if 'image' in item:
                     list_item.setInfo('pictures', item['image'])
                 if 'thumbnail' in item and item['thumbnail']:
-                    list_item.setIconImage(item['thumbnail'])
-                    list_item.setThumbnailImage(item['thumbnail'])
+                    list_item.setArt({'icon': item['thumbnail'], 'thumb': item['thumbnail']})
             if url:
                 context_options.extend(self.get_context_options(list_item, params, is_folder))
                 list_item.addContextMenuItems(context_options)

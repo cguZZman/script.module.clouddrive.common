@@ -54,6 +54,11 @@ class KodiUtils:
         return xbmcgui.getCurrentWindowId()
     
     @staticmethod
+    def get_supported_media(media_type):
+        import xbmc
+        return xbmc.getSupportedMedia(media_type).replace(".","").split("|")
+    
+    @staticmethod
     def execute_json_rpc(method, params=None, request_id=1):
         import xbmc
         import json
