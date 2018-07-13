@@ -48,20 +48,28 @@ class ErrorReport(object):
         line2 = Utils.unicode(ex)
         
         send_report = True
+        log_report = True
         if rex and rex.response:
             line1 = Utils.unicode(rex)
             line2 = ExceptionUtils.extract_error_message(rex.response)
         
-        if httpex and (httpex.code == 401 or httpex.code == 404):
-            send_report = False
-        
+        if httpex:
+            if httpex.code == 401:
+                send_report = False
+            elif httpex.code == 404:
+                send_report = False
+                log_report = False
+            
         addonid = KodiUtils.get_addon_info('id')
         addon_version = KodiUtils.get_addon_info('version')
         common_addon_version = KodiUtils.get_addon_info('version', 'script.module.clouddrive.common')
         report = '[%s] [%s]/[%s]\n\n%s\n%s\n%s\n\n%s' % (addonid, addon_version, common_addon_version, line1, line2, '', stacktrace)
         if rex:
             report += '\n\n%s\nResponse:\n%s' % (rex.request, rex.response)
-        Logger.debug(report)
+        if log_report:
+            Logger.debug(report)
+        else:
+            Logger.debug(ex)
         if send_report:
             Logger.notice(report)
             Logger.notice('Report sent')

@@ -37,7 +37,6 @@ class Cache(object):
         self._name = name
         self._expiration = expiration
         self._monitor = KodiUtils.get_system_monitor()
-        self.cleanup()
     
     def __del__(self):
         self._abort = True
@@ -77,38 +76,36 @@ class Cache(object):
         self._execute_sql("delete from cache")
 
     def _read(self, key):
-        rs = self._execute_sql("select value, expiration from cache where key = ?", (key,))
-        return rs.fetchone()
+        return self._execute_sql("select value, expiration from cache where key = ?", (key,))
         
     def _insert(self, key, value, expiration):
         self._execute_sql("insert or replace into cache(key, value, expiration) values(?,?,?)", (key, repr(value), expiration,))
         
-    def cleanup(self):
-        now = self._get_datetime(datetime.datetime.now())
-        self._execute_sql("delete from cache where expiration < ?", (now,))
-    
     def _execute_sql(self, query, data=None):
-        with self._get_connection() as con:
+        result = None
+        con = self._get_connection()
+        with con:
             retries = 0
             error = None
-            while not retries == 10:
-                if self._abort:
-                    return None
+            while retries < 15 and not self._abort:
                 try:
+                    con.execute("delete from cache where expiration < ?", (self._get_datetime(datetime.datetime.now()),))
                     if data:
-                        result = con.execute(query, data)
+                        result = con.execute(query, data).fetchone()
                     else:
-                        result = con.execute(query)
-                    return result
+                        result = con.execute(query).fetchone()
+                    break
                 except sqlite3.OperationalError as error:
                     if "_database is locked" in error:
                         retries += 1
-                        Logger.warning("Cache query retrying #d [%s]: %s" % (retries, query, str(data),))
-                        self._monitor.waitForAbort(0.5)
+                        Logger.debug("Cache query retrying #d [%s]: %s" % (retries, query, str(data),))
+                        self._monitor.waitForAbort(0.3)
                     else:
                         break
                 except Exception as error:
                     break
-            Logger.error("Error executing cache query [%s]: %s" % (query, str(error),))
-        return None
+            if error:
+                Logger.debug("Error executing cache query [%s]: %s" % (query, str(error),))
+        con.close()
+        return result
 

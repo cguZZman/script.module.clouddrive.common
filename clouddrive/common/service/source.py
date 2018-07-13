@@ -172,7 +172,6 @@ class Source(BaseHandler):
                 response_code = 303
                 if path:
                     key = '%s%s:children' % (driveid, path[0:path.rfind('/')],)
-                    Logger.debug('reading cache key: ' + key)
                     children = self._children_cache.get(key)
                     if not children and type(children) is NoneType:
                         self.show_folder(driveid, path[0:path.rfind('/')+1])
@@ -206,7 +205,6 @@ class Source(BaseHandler):
             quoted_name = urllib.quote(file_name)
             children.append(quoted_name)
             key = base_key + quoted_name
-            Logger.debug('Saving item in cache: %s' % key)
             self._items_cache.set(key, item)
             if 'folder' in item:
                 file_name += '/'
@@ -214,8 +212,9 @@ class Source(BaseHandler):
             size = self.get_size(Utils.default(Utils.get_safe_value(item, 'size'), -1))
             description = Utils.default(Utils.get_safe_value(item, 'description'), '&nbsp;')
             self.add_row(table, file_name, date, size, description)
+        if path_len == 1:
+            path = ''
         key = '%s%s:children' % (driveid, path,)
-        Logger.debug('saving cache key: ' + key)
         self._children_cache.set(key, children)
         self.close_table(table)
         return html
@@ -226,11 +225,9 @@ class Source(BaseHandler):
             filename = path[index+1:]
             path = path[0:index]
             key = '%s%s:children' % (driveid, path,)
-            Logger.debug('testing possible path key: ' + key)
             children = self._children_cache.get(key)
             if children or type(children) is list:
                 if not filename in children:
-                    Logger.debug('Not found. From cache.') 
                     raise RequestException('Not found. From cache.', HTTPError(self.path, 404, 'Not found.', None, None), 'Request URL: %s' % self.path, None)
                 return True
             index = path.rfind('/')
@@ -238,14 +235,12 @@ class Source(BaseHandler):
         
     def get_download_url(self, driveid, path):
         key = '%s%s' % (driveid, path,)
-        Logger.debug('Testing item from cache: %s' % key)
         item = self._items_cache.get(key)
         if not item:
             provider = self.server.data()
             provider.configure(self._account_manager, driveid)
             self.is_path_possible(driveid, path)
             item = provider.get_item(path=path, include_download_info = True)
-            Logger.debug('Saving item in cache: %s' % key)
             self._items_cache.set(key, item)
         if 'folder' in item:
             return self.path + '/'
