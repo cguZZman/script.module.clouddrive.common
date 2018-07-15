@@ -25,12 +25,15 @@ from clouddrive.common.remote.signin import Signin
 
 class Provider(OAuth2):
     name = ''
+    source_mode = False
     _signin = Signin()
     _account_manager = None
     _driveid = None
     
-    def __init__(self, name):
+    
+    def __init__(self, name, source_mode = False):
         self.name = name
+        self.source_mode = source_mode
         
     def create_pin(self, request_params=None):
         return self._signin.create_pin(self.name, request_params)

@@ -68,12 +68,20 @@ class Cache(object):
     def set(self, key, value):
         expiration = self._get_datetime(datetime.datetime.now() + self._expiration)
         self._insert(key, value, expiration)
+    
+    def setmany(self, key_value_list):
+        expiration = self._get_datetime(datetime.datetime.now() + self._expiration)
+        for kv in key_value_list:
+            kv[1] = repr(kv[1])
+            kv.append(expiration)
+        self._execute_sql("insert or replace into cache(key, value, expiration) values(?,?,?)", key_value_list)
         
     def remove(self, key):
         self._execute_sql("delete from cache where key = ?", (key,))
     
     def clear(self):
         self._execute_sql("delete from cache")
+        Logger.debug("Cache '%s' cleared" % self._name)
 
     def _read(self, key):
         return self._execute_sql("select value, expiration from cache where key = ?", (key,))
@@ -90,7 +98,9 @@ class Cache(object):
             while retries < 15 and not self._abort:
                 try:
                     con.execute("delete from cache where expiration < ?", (self._get_datetime(datetime.datetime.now()),))
-                    if data:
+                    if isinstance(data, list):
+                        result = con.executemany(query, data).fetchone()
+                    elif data:
                         result = con.execute(query, data).fetchone()
                     else:
                         result = con.execute(query).fetchone()

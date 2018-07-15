@@ -375,7 +375,10 @@ class CloudDriveAddon(RemoteProcessCallable):
             if url:
                 context_options.extend(self.get_context_options(list_item, params, is_folder))
                 list_item.addContextMenuItems(context_options)
-                list_item.setProperty('mimetype', Utils.get_safe_value(item, 'mimetype'))
+                mimetype = Utils.default(Utils.get_mimetype_by_extension(item_name_extension), Utils.get_safe_value(item, 'mimetype'))
+                if mimetype:
+                    list_item.setProperty('mimetype', mimetype)
+                
                 listing.append((url, list_item, is_folder))
         xbmcplugin.addDirectoryItems(self._addon_handle, listing, len(listing))
         xbmcplugin.endOfDirectory(self._addon_handle, True)

@@ -37,7 +37,6 @@ from clouddrive.common.utils import Utils
 class Source(BaseHandler):
     _system_monitor = None
     _account_manager = None
-    _cache = None
 
     kilobyte = 1024.0
     megabyte = kilobyte*kilobyte
@@ -56,7 +55,11 @@ class Source(BaseHandler):
     def __del__(self):
         del self._system_monitor
         del self._account_manager
-        
+        Logger.debug('Request destroyed.')
+    
+    def _get_provider(self):
+        return self.server.data(source_mode = True)
+    
     def open_table(self, title):
         title = urllib.unquote(title)
         html = XHTML('html')
@@ -134,7 +137,7 @@ class Source(BaseHandler):
     def get_drive_list(self):
         drives = []
         accounts = self._account_manager.load()
-        provider = self.server.data()
+        provider = self._get_provider()
         for account_id in accounts:
             account = accounts[account_id]
             for drive in account['drives']:
@@ -172,9 +175,10 @@ class Source(BaseHandler):
                 response_code = 303
                 if path:
                     key = '%s%s:children' % (driveid, path[0:path.rfind('/')],)
+                    Logger.debug('reading cache key: ' + key)
                     children = self._children_cache.get(key)
                     if not children and type(children) is NoneType:
-                        self.show_folder(driveid, path[0:path.rfind('/')+1])
+                        self.get_folder_items(driveid, path[0:path.rfind('/')+1])
                     
                     url = self.get_download_url(driveid, path)
                 else:
@@ -187,35 +191,47 @@ class Source(BaseHandler):
             response_code = 404
             response.write('Drive "%s" does not exist for addon "%s"' % (drive_name, addon_name))
         return {'response_code': response_code, 'content': response, 'headers': headers}
+    
+    def get_folder_items(self, driveid, path):
+        provider = self._get_provider()
+        provider.configure(self._account_manager, driveid)
+        cache_path = path[:len(path)-1]
+        request_path = cache_path if len(path) > 1 else path
+        self.is_path_possible(driveid, request_path)
+        key = '%s%s:items' % (driveid, cache_path,)
+        items = self._items_cache.get(key)
+        if not items and type(items) is NoneType:
+            items = provider.get_folder_items(path=request_path, include_download_info=True)
+            self._items_cache.set(key, items)
+            children_names = []
+            cache_items = []
+            for item in items:
+                quoted_name = urllib.quote(Utils.str(item['name']))
+                children_names.append(quoted_name)
+                key = '%s%s%s' % (driveid, path, quoted_name,)
+                Logger.debug('Adding item in cache for bulk: %s' % key)
+                cache_items.append([key, item])
+            self._items_cache.setmany(cache_items)
+            Logger.debug('Cache in bulk saved')
+            key = '%s%s:children' % (driveid, cache_path,)
+            Logger.debug('saving children names for: ' + key)
+            self._children_cache.set(key, children_names)
+        else:
+            Logger.debug('items for %s served from cache' % path)
+        return items
 
     def show_folder(self, driveid, path):
-        provider = self.server.data()
-        provider.configure(self._account_manager, driveid)
-        path_len = len(path)
-        base_key = '%s%s' % (driveid, path,)
-        if path_len > 1:
-            path = path[:path_len-1]
-        self.is_path_possible(driveid, path)
-        items = provider.get_folder_items(path=path, include_download_info=True)
+        items = self.get_folder_items(driveid, path)
         html, table = self.open_table('Index of ' + self.path)
         self.add_row(table, '../')
-        children = []
         for item in items:
             file_name = Utils.str(item['name'])
-            quoted_name = urllib.quote(file_name)
-            children.append(quoted_name)
-            key = base_key + quoted_name
-            self._items_cache.set(key, item)
             if 'folder' in item:
                 file_name += '/'
             date = Utils.default(self.date_time_string(KodiUtils.to_timestamp(Utils.get_safe_value(item, 'last_modified_date'))), '  - ')
             size = self.get_size(Utils.default(Utils.get_safe_value(item, 'size'), -1))
             description = Utils.default(Utils.get_safe_value(item, 'description'), '&nbsp;')
             self.add_row(table, file_name, date, size, description)
-        if path_len == 1:
-            path = ''
-        key = '%s%s:children' % (driveid, path,)
-        self._children_cache.set(key, children)
         self.close_table(table)
         return html
     
@@ -225,9 +241,11 @@ class Source(BaseHandler):
             filename = path[index+1:]
             path = path[0:index]
             key = '%s%s:children' % (driveid, path,)
+            Logger.debug('testing possible path key: ' + key)
             children = self._children_cache.get(key)
             if children or type(children) is list:
-                if not filename in children:
+                if filename and not filename in children:
+                    Logger.debug('Not found. From cache.') 
                     raise RequestException('Not found. From cache.', HTTPError(self.path, 404, 'Not found.', None, None), 'Request URL: %s' % self.path, None)
                 return True
             index = path.rfind('/')
@@ -235,12 +253,14 @@ class Source(BaseHandler):
         
     def get_download_url(self, driveid, path):
         key = '%s%s' % (driveid, path,)
+        Logger.debug('Testing item from cache: %s' % key)
         item = self._items_cache.get(key)
         if not item:
-            provider = self.server.data()
+            provider = self._get_provider()
             provider.configure(self._account_manager, driveid)
             self.is_path_possible(driveid, path)
             item = provider.get_item(path=path, include_download_info = True)
+            Logger.debug('Saving item in cache: %s' % key)
             self._items_cache.set(key, item)
         if 'folder' in item:
             return self.path + '/'
@@ -355,6 +375,10 @@ class SourceService(BaseService):
     def __init__(self, provider_class, handler=Source):
         super(SourceService, self).__init__(provider_class)
         self._handler = handler
+        addonid = KodiUtils.get_addon_info('id')
+        Cache(addonid, 'page', 0).clear()
+        Cache(addonid, 'children', 0).clear()
+        Cache(addonid, 'items', 0).clear()
     
     def get_port(self):
         return int(KodiUtils.get_addon_setting('port_directory_listing'))
