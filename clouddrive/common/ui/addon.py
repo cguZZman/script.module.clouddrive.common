@@ -23,24 +23,25 @@ import sys
 import threading
 import time
 import urllib
-from urllib2 import HTTPError
+from urllib2 import HTTPError, URLError
 import urlparse
 
 from clouddrive.common.account import AccountManager, AccountNotFoundException, \
     DriveNotFoundException
+from clouddrive.common.cache.cache import Cache
 from clouddrive.common.exception import UIException, ExceptionUtils, RequestException
 from clouddrive.common.remote.errorreport import ErrorReport
+from clouddrive.common.remote.request import Request
+from clouddrive.common.service.download import DownloadServiceUtil
 from clouddrive.common.service.rpc import RemoteProcessCallable
-from clouddrive.common.ui.dialog import DialogProgress, DialogProgressBG
+from clouddrive.common.ui.dialog import DialogProgress, DialogProgressBG,\
+    QRDialogProgress
 from clouddrive.common.ui.logger import Logger
+from clouddrive.common.ui.utils import KodiUtils
 from clouddrive.common.utils import Utils
 import xbmcgui
 import xbmcplugin
 import xbmcvfs
-from clouddrive.common.service.download import DownloadServiceUtil
-from clouddrive.common.ui.utils import KodiUtils
-from clouddrive.common.cache.cache import Cache
-from clouddrive.common.remote.request import Request
 
 
 class CloudDriveAddon(RemoteProcessCallable):
@@ -94,6 +95,7 @@ class CloudDriveAddon(RemoteProcessCallable):
         self._system_monitor = KodiUtils.get_system_monitor()
         self._account_manager = AccountManager(self._profile_path)
         self._home_window = xbmcgui.Window(10000)
+        self._pin_dialog = None
         
         if len(sys.argv) > 1:
             self._addon_handle = int(sys.argv[1])
@@ -138,7 +140,7 @@ class CloudDriveAddon(RemoteProcessCallable):
         return
     
     def cancel_operation(self):
-        return self._system_monitor.abortRequested() or self._progress_dialog.iscanceled() or self._cancel_operation
+        return self._system_monitor.abortRequested() or self._progress_dialog.iscanceled() or self._cancel_operation or (self._pin_dialog and self._pin_dialog.iscanceled())
 
     def _get_display_name(self, account, drive=None, with_format=False):
         return self._account_manager.get_account_display_name(account, drive, self.get_provider(), with_format)
@@ -197,6 +199,7 @@ class CloudDriveAddon(RemoteProcessCallable):
         
         self._ip_before_pin = Request(KodiUtils.get_signin_server() + '/ip', None).request()
         pin_info = provider.create_pin(request_params)
+        self._progress_dialog.close()
         if self.cancel_operation():
             return
         if not pin_info:
@@ -204,18 +207,23 @@ class CloudDriveAddon(RemoteProcessCallable):
 
         tokens_info = {}
         request_params['on_complete'] = lambda request: self._progress_dialog_bg.close()
-        self._progress_dialog.update(100, self._common_addon.getLocalizedString(32009) % '[B]%s[/B]' % KodiUtils.get_signin_server(), self._common_addon.getLocalizedString(32010) % '[B][COLOR lime]%s[/COLOR][/B]' % pin_info['pin'])
+        self._pin_dialog = QRDialogProgress.create(self._addon_name,
+                                      KodiUtils.get_signin_server() + '/signin/%s' % pin_info['pin'], 
+                                      self._common_addon.getLocalizedString(32009), 
+                                      self._common_addon.getLocalizedString(32010) % ('[B]%s[/B]' % KodiUtils.get_signin_server(), '[B][COLOR lime]%s[/COLOR][/B]' % pin_info['pin']))
+        self._pin_dialog.show()
         max_waiting_time = time.time() + self._DEFAULT_SIGNIN_TIMEOUT
         while not self.cancel_operation() and max_waiting_time > time.time():
             remaining = round(max_waiting_time-time.time())
             percent = int(remaining/self._DEFAULT_SIGNIN_TIMEOUT*100)
-            self._progress_dialog.update(percent, line3=self._common_addon.getLocalizedString(32011) % str(int(remaining)))
+            self._pin_dialog.update(percent, line3='[CR]'+self._common_addon.getLocalizedString(32011) % str(int(remaining)))
             if int(remaining) % 5 == 0 or remaining == 1:
                 tokens_info = provider.fetch_tokens_info(pin_info, request_params = request_params)
                 if self.cancel_operation() or tokens_info:
                     break
             if self._system_monitor.waitForAbort(1):
                 break
+        self._pin_dialog.close()
         
         if self.cancel_operation() or time.time() >= max_waiting_time:
             return
@@ -267,7 +275,7 @@ class CloudDriveAddon(RemoteProcessCallable):
         
         self._progress_dialog.close()
         KodiUtils.executebuiltin('Container.Refresh')
-    
+
     def _remove_drive(self, driveid):
         self._account_manager.load()
         account = self._account_manager.get_account_by_driveid(driveid)
@@ -457,11 +465,10 @@ class CloudDriveAddon(RemoteProcessCallable):
         if self._home_window.getProperty(self._addonid + 'exporting'):
             self._dialog.ok(self._addon_name, self._common_addon.getLocalizedString(32059) + ' ' + self._common_addon.getLocalizedString(32038))
         else:
-            string_id = 32002 if self._content_type == 'audio' else 32001
             string_config = 'music_library_folder' if self._content_type == 'audio' else 'video_library_folder'
             export_folder = self._addon.getSetting(string_config)
             if not export_folder or not xbmcvfs.exists(export_folder):
-                export_folder = self._dialog.browse(0, self._common_addon.getLocalizedString(string_id), 'files', '', False, False, '')
+                export_folder = self._dialog.browse(0, self._common_addon.getLocalizedString(32002), 'files', '', False, False, '')
             if xbmcvfs.exists(export_folder):
                 self._export_progress_dialog_bg.create(self._addon_name + ' ' + self._common_addon.getLocalizedString(32024), self._common_addon.getLocalizedString(32025))
                 self._export_progress_dialog_bg.update(0)
@@ -555,7 +562,7 @@ class CloudDriveAddon(RemoteProcessCallable):
         rex = ExceptionUtils.extract_exception(ex, RequestException)
         uiex = ExceptionUtils.extract_exception(ex, UIException)
         httpex = ExceptionUtils.extract_exception(ex, HTTPError)
-        
+        urlex = ExceptionUtils.extract_exception(ex, URLError)
         line1 = self._common_addon.getLocalizedString(32027)
         line2 = Utils.unicode(ex)
         line3 = self._common_addon.getLocalizedString(32016)
@@ -604,6 +611,18 @@ class CloudDriveAddon(RemoteProcessCallable):
                             send_report = False
                             line1 = self._common_addon.getLocalizedString(32072)
                             line2 = self._common_addon.getLocalizedString(32073) % (self._ip_before_pin, ip_after_pin,)
+        elif urlex:
+            reason = Utils.str(urlex.reason)
+            line3 = self._common_addon.getLocalizedString(32074)
+            if '[Errno 101]' in reason:
+                line1 = self._common_addon.getLocalizedString(32076)
+            elif '[Errno 11001]' in reason:
+                line1 = self._common_addon.getLocalizedString(32077)
+            elif 'CERTIFICATE_VERIFY_FAILED' in reason:
+                line1 = self._common_addon.getLocalizedString(32078)
+            else:
+                line1 = self._common_addon.getLocalizedString(32075)
+            
         report = '[%s] [%s]/[%s]\n\n%s\n%s\n%s\n\n%s' % (self._addonid, self._addon_version, self._common_addon_version, line1, line2, line3, stacktrace)
         if rex:
             report += '\n\n%s\nResponse:\n%s' % (rex.request, rex.response)
@@ -642,7 +661,6 @@ class CloudDriveAddon(RemoteProcessCallable):
                 for name in inspect.getargspec(method)[0]:
                     if name in self._addon_params:
                         arguments[name] = self._addon_params[name]
-                Logger.notice(arguments)
                 method(**arguments)
             else:
                 self.list_accounts()
@@ -652,6 +670,8 @@ class CloudDriveAddon(RemoteProcessCallable):
             self._progress_dialog.close()
             self._progress_dialog_bg.close()
             self._export_progress_dialog_bg.close()
+            if self._pin_dialog:
+                self._pin_dialog.close()
             if self._exporting:
                 self._home_window.clearProperty(self._addonid + 'exporting')
 

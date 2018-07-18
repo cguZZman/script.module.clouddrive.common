@@ -30,6 +30,7 @@ class KodiUtils:
     LOGWARNING = 2
     LOGERROR = 3
     lock = Lock()
+    common_addon_id = 'script.module.clouddrive.common'
     
     @staticmethod
     def get_addon(addonid=None):
@@ -38,6 +39,10 @@ class KodiUtils:
             return xbmcaddon.Addon(addonid)
         else:
             return xbmcaddon.Addon()
+    @staticmethod
+    def get_common_addon():
+        import xbmcaddon
+        return xbmcaddon.Addon(KodiUtils.common_addon_id)
     
     @staticmethod
     def get_system_monitor():
@@ -79,9 +84,11 @@ class KodiUtils:
         xbmc.executebuiltin(cmd, wait)
         
     @staticmethod
-    def run_script(addonid, params=None, wait=False):
+    def run_script(script, params=None, wait=False):
         import xbmc
-        cmd = 'RunScript(%s,0,%s)' % (addonid, '?%s' % urllib.urlencode(params))
+        if params:
+            params = urllib.urlencode(params)
+        cmd = 'RunScript(%s,0,?%s)' % (script, params)
         xbmc.executebuiltin(cmd, wait)
         
     @staticmethod

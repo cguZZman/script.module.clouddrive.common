@@ -16,6 +16,9 @@ msgstr ""
 "Language: en\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 
+msgctxt "#32002"
+msgid "Select destination folder"
+msgstr ""
 
 msgctxt "#32004"
 msgid "Export to library (.strm)..."
@@ -38,11 +41,11 @@ msgid "Connecting with server, please wait..."
 msgstr ""
 
 msgctxt "#32009"
-msgid "Go to URL: %s"
+msgid "Scan the QR code and sign in."
 msgstr ""
 
 msgctxt "#32010"
-msgid "Enter this code and follow instructions: %s"
+msgid "or[CR]Go to this URL: %s[CR]enter the code and sign in: %s"
 msgstr ""
 
 msgctxt "#32011"
@@ -287,5 +290,25 @@ msgstr ""
 
 msgctxt "#32073"
 msgid "Ip change detected: [B]%s[/B] to [B]%s[/B]. Make sure you stay in the same network."
+msgstr ""
+
+msgctxt "#32074"
+msgid "Check your internet connection and try again."
+msgstr ""
+
+msgctxt "#32075"
+msgid "There is a problem with your network connection."
+msgstr ""
+
+msgctxt "#32076"
+msgid "No network connection detected."
+msgstr ""
+
+msgctxt "#32077"
+msgid "Unable to reach the server."
+msgstr ""
+
+msgctxt "#32078"
+msgid "The SSL connection has failed (insecure connection detected)."
 msgstr ""
 
