@@ -145,10 +145,11 @@ class QRDialogProgress(xbmcgui.WindowXMLDialog):
     
     def onClick(self, control_id):
         if (control_id == self._cancel_btn_control):
+            self.canceled = True
             self.close()
     
-    def close(self):
-        self.canceled = True
+    #def close(self):
+    #    self.canceled = True
 
     def onAction(self, action):
         if action.getId() == xbmcgui.ACTION_PREVIOUS_MENU or action.getId() == xbmcgui.ACTION_NAV_BACK:
