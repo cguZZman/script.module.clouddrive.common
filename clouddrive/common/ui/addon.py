@@ -555,7 +555,8 @@ class CloudDriveAddon(RemoteProcessCallable):
             for subtitle in item['subtitles']:
                 subtitles.append(DownloadServiceUtil.build_download_url(driveid, Utils.default(Utils.get_safe_value(subtitle, 'drive_id'), driveid), subtitle['id'], urllib.quote(Utils.str(subtitle['name']))))
             list_item.setSubtitles(subtitles)
-        xbmcplugin.setResolvedUrl(self._addon_handle, True, list_item)
+        if not self.cancel_operation():
+            xbmcplugin.setResolvedUrl(self._addon_handle, True, list_item)
     
     def _handle_exception(self, ex, show_error_dialog = True):
         stacktrace = ExceptionUtils.full_stacktrace(ex)
