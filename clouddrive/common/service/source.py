@@ -28,13 +28,13 @@ from clouddrive.common.cache.cache import Cache
 from clouddrive.common.exception import ExceptionUtils, RequestException
 from clouddrive.common.html import XHTML
 from clouddrive.common.remote.errorreport import ErrorReport
-from clouddrive.common.service.base import BaseService, BaseHandler
+from clouddrive.common.service.base import BaseServerService, BaseHandler
 from clouddrive.common.ui.logger import Logger
 from clouddrive.common.ui.utils import KodiUtils
 from clouddrive.common.utils import Utils
 
 
-class Source(BaseHandler):
+class Source(BaseServerService):
     _system_monitor = None
     _account_manager = None
 
@@ -368,7 +368,7 @@ class SourceRedirector(Source):
 
         return response
     
-class SourceService(BaseService):
+class SourceService(BaseServerService):
     name = 'source'
     profile_path = Utils.unicode(KodiUtils.translate_path(KodiUtils.get_addon_info('profile')))
     

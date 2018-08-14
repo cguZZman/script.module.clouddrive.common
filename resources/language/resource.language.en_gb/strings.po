@@ -16,12 +16,24 @@ msgstr ""
 "Language: en\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 
+msgctxt "#32000"
+msgid "Exports"
+msgstr ""
+
+msgctxt "#32001"
+msgid "Export of '%s' will be removed. Are you sure?"
+msgstr ""
+
 msgctxt "#32002"
 msgid "Select destination folder"
 msgstr ""
 
+msgctxt "#32003"
+msgid "Run export now"
+msgstr ""
+
 msgctxt "#32004"
-msgid "Export to library (.strm)..."
+msgid "Export to .strm files..."
 msgstr ""
 
 msgctxt "#32005"
@@ -109,7 +121,7 @@ msgid "Starting, please wait..."
 msgstr ""
 
 msgctxt "#32026"
-msgid "A valid export folder is required"
+msgid "The destination folder '%s' is invalid. It does not exist."
 msgstr ""
 
 msgctxt "#32027"
@@ -312,3 +324,30 @@ msgctxt "#32078"
 msgid "The SSL connection has failed (insecure connection detected)."
 msgstr ""
 
+msgctxt "#32079"
+msgid "Every"
+msgstr ""
+
+msgctxt "#32080"
+msgid "at"
+msgstr ""
+
+msgctxt "#32081"
+msgid "Startup"
+msgstr ""
+
+msgctxt "#32082"
+msgid "Day"
+msgstr ""
+
+msgctxt "#32083"
+msgid "Schedules"
+msgstr ""
+
+msgctxt "#32084"
+msgid "%s is required."
+msgstr ""
+
+msgctxt "#32085"
+msgid "Destination"
+msgstr ""
