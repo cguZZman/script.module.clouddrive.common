@@ -124,15 +124,15 @@ class ExportService(object):
         changes_by_drive = {}
         for export in exports:
             item_id = export['id']
+            driveid = export['driveid']
+            if driveid in changes_by_drive:
+                changes = changes_by_drive[driveid]
+            else:
+                self.provider.configure(self._account_manager, export['driveid'])
+                changes = self.provider.changes()
+                changes_by_drive[driveid] = changes
             items_info = self.export_manager.get_items_info(item_id)
             if items_info:
-                driveid = export['driveid']
-                if driveid in changes_by_drive:
-                    changes = changes_by_drive[driveid]
-                else:
-                    self.provider.configure(self._account_manager, export['driveid'])
-                    changes = self.provider.changes()
-                    changes_by_drive[driveid] = changes
                 if changes and not Utils.get_safe_value(export, 'exporting', False):
                     Logger.debug('*** Processing changes for export "%s" in %s' % (export['name'], export['destination_folder']))
                     while True:
@@ -166,14 +166,15 @@ class ExportService(object):
         change_type = 'delete'
         item_info = items_info[item_id]
         item_info_path = item_info['full_local_path']
-        if is_folder:
-            Logger.debug('Change is delete folder: %s' % item_info_path)
-            if not self.remove_folder(item_info_path):
-                change_type = 'retry'
-        else:
-            Logger.debug('Change is delete file')
-            if not KodiUtils.file_delete(item_info_path):
-                change_type = 'retry'
+        if KodiUtils.file_exists(item_info_path):
+            if is_folder:
+                Logger.debug('Change is delete folder: %s' % item_info_path)
+                if not self.remove_folder(item_info_path):
+                    change_type = 'retry'
+            else:
+                Logger.debug('Change is delete file')
+                if not KodiUtils.file_delete(item_info_path):
+                    change_type = 'retry'
         if change_type != 'retry':
             ExportManager.remove_item_info(items_info, item_id)
         return change_type
