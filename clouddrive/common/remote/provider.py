@@ -59,12 +59,17 @@ class Provider(OAuth2):
         self.validate_configuration()
         self._account_manager.load()
         return self._account_manager.get_account_by_driveid(self._driveid)
+
+    def _drive_from_manager(self):
+        self.validate_configuration()
+        self._account_manager.load()
+        return self._account_manager.get_drive_by_driveid(self._driveid)
         
     def get_access_tokens(self):
         return self._account_from_manager()['access_tokens']
     
     def get_change_token(self):
-        return Utils.get_safe_value(self._account_from_manager(), 'change_token')
+        return Utils.get_safe_value(self._drive_from_manager(), 'change_token')
     
     def refresh_access_tokens(self, request_params=None):
         tokens = self.get_access_tokens()
@@ -79,9 +84,9 @@ class Provider(OAuth2):
         self._account_manager.add_account(account)
     
     def persist_change_token(self, change_token):
-        account = self._account_from_manager()
-        account['change_token'] = change_token
-        self._account_manager.add_account(account)
+        drive = self._drive_from_manager()
+        drive['change_token'] = change_token
+        self._account_manager.save()
     
     def get_account(self, request_params=None, access_tokens=None):
         raise NotImplementedError()
