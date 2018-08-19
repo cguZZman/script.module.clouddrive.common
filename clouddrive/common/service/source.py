@@ -34,7 +34,7 @@ from clouddrive.common.ui.utils import KodiUtils
 from clouddrive.common.utils import Utils
 
 
-class Source(BaseServerService):
+class Source(BaseHandler):
     _system_monitor = None
     _account_manager = None
 
