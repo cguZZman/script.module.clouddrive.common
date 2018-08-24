@@ -22,6 +22,7 @@ import os
 from clouddrive.common.ui.utils import KodiUtils
 from clouddrive.common.utils import Utils
 import urllib
+from clouddrive.common.remote.request import Request
 
 
 class ExportManager(object):
@@ -99,12 +100,25 @@ class ExportManager(object):
     def create_strm(driveid, item, file_path, content_type, addon_url):
         item_id = Utils.str(item['id'])
         item_drive_id = Utils.default(Utils.get_safe_value(item, 'drive_id'), driveid)
-        f = KodiUtils.file(file_path, 'w')
-        f.write(addon_url + '?' + urllib.urlencode({'action':'play', 'content_type': content_type, 'item_driveid': item_drive_id, 'item_id': item_id, 'driveid': driveid}))
-        f.close()
+        f = None
+        try:
+            f = KodiUtils.file(file_path, 'w')
+            content = addon_url + '?' + urllib.urlencode({'action':'play', 'content_type': content_type, 'item_driveid': item_drive_id, 'item_id': item_id, 'driveid': driveid})
+            if item['name_extension'] == 'strm':
+                content = Request(item['download_info']['url'], None).request()
+            f.write(content)
+        except:
+            return False
+        finally:
+            if f:
+                f.close()
         return True
         
     def save_items_info(self, exportid, items_info):
-        f = KodiUtils.file(self.get_items_info_path(exportid), 'w')
-        f.write(repr(items_info))
-        f.close()
+        f = None
+        try:
+            f = KodiUtils.file(self.get_items_info_path(exportid), 'w')
+            f.write(repr(items_info))
+        finally:
+            if f:
+                f.close()
