@@ -39,6 +39,8 @@ class ExportService(object):
         self._startup_type = Utils.str(ExportScheduleDialog._startup_type)
         self.export_manager = ExportManager(self._profile_path)
         self._account_manager = AccountManager(self._profile_path)
+        self._video_file_extensions = KodiUtils.get_supported_media("video")
+        self._audio_file_extensions = KodiUtils.get_supported_media("music")
     
     def __del__(self):
         del self._system_monitor
@@ -225,19 +227,22 @@ class ExportService(object):
                     Logger.debug('Invalid state. Changed item not found: %s. Deleting from item list.' % item_info_path)
                     change_type = self.process_change_delete(items_info, changed_item_id, is_folder)
             elif parent_id in items_info and not deleted:
-                change_type = 'add'
-                Logger.debug('Change is new item')
-                parent_item_info = items_info[parent_id]
-                parent_item_path = parent_item_info['full_local_path']
-                new_path = os.path.join(parent_item_path, changed_item_name)
-                if is_folder:
-                    new_path = os.path.join(new_path, '')
-                    if not KodiUtils.mkdirs(new_path):
-                        change_type = 'retry'
-                else:
-                    ExportManager.create_strm(export['driveid'], change, new_path, export['content_type'], 'plugin://%s/' % self.addonid)
-                if change_type != 'retry':
-                    ExportManager.add_item_info(items_info, changed_item_id, changed_item_name, new_path, parent_id)
+                content_type = export['content_type']
+                item_name_extension = change['name_extension']
+                if is_folder or (('video' in change or item_name_extension in self._video_file_extensions) and content_type == 'video') or ('audio' in change and content_type == 'audio'):
+                    change_type = 'add'
+                    Logger.debug('Change is new item')
+                    parent_item_info = items_info[parent_id]
+                    parent_item_path = parent_item_info['full_local_path']
+                    new_path = os.path.join(parent_item_path, changed_item_name)
+                    if is_folder:
+                        new_path = os.path.join(new_path, '')
+                        if not KodiUtils.mkdirs(new_path):
+                            change_type = 'retry'
+                    else:
+                        ExportManager.create_strm(export['driveid'], change, new_path, content_type, 'plugin://%s/' % self.addonid)
+                    if change_type != 'retry':
+                        ExportManager.add_item_info(items_info, changed_item_id, changed_item_name, new_path, parent_id)
         Logger.debug('change type: %s ' % Utils.str(change_type))
         return change_type
     
