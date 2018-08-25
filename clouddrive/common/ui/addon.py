@@ -338,7 +338,7 @@ class CloudDriveAddon(RemoteProcessCallable):
     
     def _remove_export(self, driveid, item_id):
         export_manager = ExportManager(self._account_manager._addon_data_path)
-        item = export_manager.load()[item_id]['item']
+        item = export_manager.load()[item_id]
         if self._dialog.yesno(self._addon_name, self._common_addon.getLocalizedString(32001) % Utils.unicode(item['name']), None):
             export_manager.remove_export(item_id)
             KodiUtils.executebuiltin('Container.Refresh')
