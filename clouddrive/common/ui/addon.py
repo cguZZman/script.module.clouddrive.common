@@ -477,10 +477,10 @@ class CloudDriveAddon(RemoteProcessCallable):
             if 'extra_params' in item:
                 params.update(item['extra_params'])
             context_options = []
+            info = {'size': item['size'], 'date': KodiUtils.to_kodi_item_date_str(KodiUtils.to_datetime(Utils.get_safe_value(item, 'last_modified_date')))}
             if is_folder:
                 params['action'] = '_list_folder'
                 url = self._addon_url + '?' + urllib.urlencode(params)
-                
                 params['action'] = '_search'
                 cmd = 'ActivateWindow(%d,%s?%s)' % (xbmcgui.getCurrentWindowId(), self._addon_url, urllib.urlencode(params))
                 context_options.append((self._common_addon.getLocalizedString(32039), cmd))
@@ -496,13 +496,13 @@ class CloudDriveAddon(RemoteProcessCallable):
                 list_item.setProperty('IsPlayable', 'true')
                 params['action'] = 'play'
                 url = self._addon_url + '?' + urllib.urlencode(params)
-                info = {'size': item['size'], 'date': KodiUtils.to_timestamp(Utils.get_safe_value(item, 'last_modified_date'))}
+                info_type = self._content_type
                 if 'audio' in item:
                     info.update(item['audio'])
-                    list_item.setInfo('music', info)
+                    info_type = 'music'
                 elif 'video' in item:
                     list_item.addStreamInfo('video', item['video'])
-                    list_item.setInfo('video', info)
+                list_item.setInfo(info_type, info)
                 if 'thumbnail' in item:
                     list_item.setArt({'icon': item['thumbnail'], 'thumb': item['thumbnail']})
             elif ('image' in item or item_name_extension in self._image_file_extensions) and self._content_type == 'image' and item_name_extension != 'mp4':
@@ -511,7 +511,8 @@ class CloudDriveAddon(RemoteProcessCallable):
                 else:
                     url = DownloadServiceUtil.build_download_url(driveid, item_driveid, item_id, urllib.quote(Utils.str(item_name)))
                 if 'image' in item:
-                    list_item.setInfo('pictures', item['image'])
+                    info.update(item['image'])
+                list_item.setInfo('pictures', info)
                 if 'thumbnail' in item and item['thumbnail']:
                     list_item.setArt({'icon': item['thumbnail'], 'thumb': item['thumbnail']})
             if url:

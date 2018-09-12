@@ -212,12 +212,26 @@ class KodiUtils:
         return xbmc.translatePath(path)
     
     @staticmethod
-    def to_timestamp(s):
+    def to_kodi_item_date_str(dt):
+        s = None
+        if dt:
+            s = '%02d.%02d.%04d' % (dt.day, dt.month, dt.year,)
+        return s
+    
+    @staticmethod
+    def to_datetime(s):
         import dateutil.parser
         try:
-            return int(time.mktime(dateutil.parser.parse(s).timetuple()))
+            return dateutil.parser.parse(s)
         except:
             return None
+        
+    @staticmethod
+    def to_timestamp(s):
+        dt = KodiUtils.to_datetime(s)
+        if dt:
+            dt = int(time.mktime(dt.timetuple()))
+        return dt
     
     @staticmethod
     def file(f, opts):
