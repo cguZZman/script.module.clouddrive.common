@@ -43,6 +43,7 @@ from clouddrive.common.utils import Utils
 import xbmcgui
 import xbmcplugin
 import xbmcvfs
+from datetime import timedelta, datetime
 
 
 class CloudDriveAddon(RemoteProcessCallable):
@@ -95,6 +96,7 @@ class CloudDriveAddon(RemoteProcessCallable):
         self._system_monitor = KodiUtils.get_system_monitor()
         self._account_manager = AccountManager(self._profile_path)
         self._pin_dialog = None
+        self.iskrypton = KodiUtils.get_home_property('iskrypton') == 'true'
         
         if len(sys.argv) > 1:
             self._addon_handle = int(sys.argv[1])
@@ -604,6 +606,41 @@ class CloudDriveAddon(RemoteProcessCallable):
         item = self.get_provider().get_item(item_driveid, item_id, find_subtitles=find_subtitles)
         file_name = Utils.unicode(item['name'])
         list_item = xbmcgui.ListItem(file_name)
+        succeeded = True
+        info = KodiUtils.get_current_library_info()
+        if not info:
+            info = KodiUtils.find_exported_video_in_library(item_id, file_name + ExportManager._strm_extension)
+        if info and info['id']:
+            Logger.debug('library info: %s' % Utils.str(info))
+            KodiUtils.set_home_property('dbid', Utils.str(info['id']))
+            KodiUtils.set_home_property('dbtype', info['type'])
+            KodiUtils.set_home_property('addonid', self._addonid)
+            details = KodiUtils.get_video_details(info['type'], info['id'])
+            Logger.debug('library details: %s' % Utils.str(details))
+            if details and 'resume' in details:
+                KodiUtils.set_home_property('playcount', Utils.str(details['playcount']))
+                resume = details['resume']
+                if resume['position'] > 0:
+                    play_resume = False
+                    if self.iskrypton:
+                        play_resume = KodiUtils.get_addon_setting('resume_playing') == 'true'
+                    elif KodiUtils.get_addon_setting('ask_resume') == 'true':
+                        d = datetime(1,1,1) + timedelta(seconds=resume['position'])
+                        t = '%02d:%02d:%02d' % (d.hour, d.minute, d.second)
+                        Logger.debug(t)
+                        option = self._dialog.contextmenu([KodiUtils.localize(32054, addon=self._common_addon) % t, KodiUtils.localize(12021)])
+                        Logger.debug('selected option: %d' % option)
+                        if option == -1:
+                            succeeded = False
+                        elif option == 0:
+                            play_resume = True
+                    if play_resume:
+                        list_item.setProperty('resumetime', Utils.str(resume['position']))
+                        list_item.setProperty('startoffset', Utils.str(resume['position']))
+                        list_item.setProperty('totaltime', Utils.str(resume['total']))
+        else:
+            from clouddrive.common.service.player import KodiPlayer
+            KodiPlayer.cleanup()
         if 'audio' in item:
             list_item.setInfo('music', item['audio'])
         elif 'video' in item:
@@ -617,7 +654,7 @@ class CloudDriveAddon(RemoteProcessCallable):
                 subtitles.append(DownloadServiceUtil.build_download_url(driveid, Utils.default(Utils.get_safe_value(subtitle, 'drive_id'), driveid), subtitle['id'], urllib.quote(Utils.str(subtitle['name']))))
             list_item.setSubtitles(subtitles)
         if not self.cancel_operation():
-            xbmcplugin.setResolvedUrl(self._addon_handle, True, list_item)
+            xbmcplugin.setResolvedUrl(self._addon_handle, succeeded, list_item)
     
     def _handle_exception(self, ex, show_error_dialog = True):
         stacktrace = ExceptionUtils.full_stacktrace(ex)
