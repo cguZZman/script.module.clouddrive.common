@@ -438,6 +438,9 @@ class CloudDriveAddon(RemoteProcessCallable):
                 file_path += ExportManager._strm_extension
                 ExportManager.create_strm(driveid, item, file_path, export['content_type'], self._addon_url)
                 ExportManager.add_item_info(items_info, item_id, item_name, file_path, folder_id)
+            elif 'nfo' in item_name_extension or 'text/x-nfo' in item.get("mimetype"):
+                nfo_path = os.path.join(folder_path, Utils.unicode(item_name))
+                ExportManager.create_nfo(driveid,item,Utils.unicode(item_name),nfo_path)
             self._exporting_count += 1
             p = int(self._exporting_count/float(self._exporting_target)*100)
             if self._exporting_percent < p:
