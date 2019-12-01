@@ -403,7 +403,10 @@ class CloudDriveAddon(RemoteProcessCallable):
                 self._dialog.ok(self._addon_name, error)
             export['exporting'] = False
             export_manager.save()
-    
+
+    def _clean_export(self, driveid, folder, export_folder,items_info):
+        pass
+
     def __export_folder(self, driveid, folder, export_folder, export, items_info):
         folder_id = Utils.str(folder['id'])
         folder_name = Utils.unicode(folder['name'])
@@ -436,11 +439,16 @@ class CloudDriveAddon(RemoteProcessCallable):
             elif (('video' in item or item_name_extension in self._video_file_extensions) and export['content_type'] == 'video') or ('audio' in item and export['content_type'] == 'audio'):
                 item_name += ExportManager._strm_extension
                 file_path += ExportManager._strm_extension
+                if self._addon.getSetting('skip_unmodified') and KodiUtils.file_exists(file_path) and KodiUtils.file(file_path).size() == item["size"]:
+                    continue
                 ExportManager.create_strm(driveid, item, file_path, export['content_type'], self._addon_url)
                 ExportManager.add_item_info(items_info, item_id, item_name, file_path, folder_id)
-            elif 'nfo' in item_name_extension or 'text/x-nfo' in item.get("mimetype"):
+            elif self._addon.getSetting('nfo_export') and ('nfo' in item_name_extension or 'text/x-nfo' in item.get("mimetype")):
                 nfo_path = os.path.join(folder_path, Utils.unicode(item_name))
+                if self._addon.getSetting('skip_unmodified') and KodiUtils.file_exists(nfo_path) and KodiUtils.file(nfo_path).size() == item["size"]:
+                    continue
                 ExportManager.create_nfo(driveid,item,Utils.unicode(item_name),nfo_path)
+                ExportManager.add_item_info(items_info, item_id, item_name, nfo_path, folder_id)
             self._exporting_count += 1
             p = int(self._exporting_count/float(self._exporting_target)*100)
             if self._exporting_percent < p:
