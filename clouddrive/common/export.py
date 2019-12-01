@@ -114,7 +114,7 @@ class ExportManager(object):
                  'driveid': driveid})
             if item['name_extension'] == 'strm':
                 content = Request(item['download_info']['url'], None).request()
-            f.write(content)
+            f.write(str(content))
         except:
             return False
         finally:
