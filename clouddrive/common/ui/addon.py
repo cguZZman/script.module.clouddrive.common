@@ -23,6 +23,7 @@ import sys
 import threading
 import time
 import urllib
+import json
 from urllib2 import HTTPError, URLError
 import urlparse
 
@@ -331,6 +332,8 @@ class CloudDriveAddon(RemoteProcessCallable):
                 context_options.append((KodiUtils.localize(21479), 'RunPlugin('+self._addon_url + '?' + urllib.urlencode(params)+')'))
                 params['action'] = '_remove_export'
                 context_options.append((KodiUtils.localize(1210), 'RunPlugin('+self._addon_url + '?' + urllib.urlencode(params)+')'))
+                params['action'] = '_clean_redundant'
+                context_options.append((self._common_addon.getLocalizedString(32086), 'RunPlugin('+self._addon_url + '?' + urllib.urlencode(params)+')'))
                 list_item.addContextMenuItems(context_options)
                 listing.append((url, list_item, True))
         xbmcplugin.addDirectoryItems(self._addon_handle, listing, len(listing))
@@ -343,6 +346,55 @@ class CloudDriveAddon(RemoteProcessCallable):
             export_manager.remove_export(item_id)
             KodiUtils.executebuiltin('Container.Refresh')
     
+    def _clean_redundant(self,driveid,item_id,item_driveid):
+        export_manager = ExportManager(self._account_manager._addon_data_path)
+        folder = export_manager.load()[item_id]
+        if Utils.get_safe_value(folder, 'exporting', False):
+            self._dialog.ok(self._addon_name, self._common_addon.getLocalizedString(32059) + ' ' + self._common_addon.getLocalizedString(32038))
+        else:
+            folder['exporting'] = True
+            export_manager.save()
+            export_folder=folder['destination_folder']
+            folder_name = Utils.unicode(folder['name'])
+            folder_path = os.path.join(os.path.join(export_folder, folder_name), '')
+            if xbmcvfs.exists(folder_path):
+                if not xbmcvfs.exists(folder_path):
+                    self.get_provider().configure(self._account_manager, driveid)
+                    items_info = export_manager.get_items_info(item_id)
+                    if items_info:
+                        Logger.debug('*** Cleanup for export "%s" in %s' % (folder['name'], folder['destination_folder']))
+                        _cleanup_count=0
+                        _cleanup_percent=0
+                        _cleanup_target = len(items_info)
+                        self._export_progress_dialog_bg.create(self._addon_name + ' ' + self._common_addon.getLocalizedString(32087), self._common_addon.getLocalizedString(32025))
+                        self._export_progress_dialog_bg.update(0)
+                        for k, v in items_info.items():
+                            export_info=os.path.join(folder_name,v["name"])
+                            p = int(_cleanup_count/float(_cleanup_target)*100)
+                            if _cleanup_percent < p:
+                                _cleanup_percent = p
+                            try:
+                                i = self.get_provider().get_item(item_driveid, k)
+                            except RequestException as ex:
+                                rex = ExceptionUtils.extract_exception(ex, HTTPError)
+                                if rex.code == 404:
+                                    f_path=v.get('full_local_path')
+                                    KodiUtils.rmdir(f_path,True)
+                                    ExportManager.remove_item_info(items_info,k)
+                                    export_manager.save_items_info(item_id,items_info)
+                            _cleanup_count+=1
+                            self._export_progress_dialog_bg.update(_cleanup_percent, self._addon_name + ' ' + self._common_addon.getLocalizedString(32088),export_info)
+                    folder['exporting'] = False
+                    export_manager.save()
+                    self._export_progress_dialog_bg.close()                
+            else:
+                error = self._common_addon.getLocalizedString(32026) % folder_path
+                Logger.debug(error)
+                self._dialog.ok(self._addon_name, error)
+                folder['exporting'] = False
+                export_manager.save()
+
+        
     def _open_export(self, driveid, item_driveid, item_id, name):
         export_dialog = ExportMainDialog.create(self._content_type, driveid, item_driveid, item_id, name, self._account_manager, self.get_provider())
         export_dialog.doModal()
@@ -362,7 +414,6 @@ class CloudDriveAddon(RemoteProcessCallable):
         export_manager = ExportManager(self._account_manager._addon_data_path)
         export = export_manager.load()[item_id]
         Logger.debug('Running export:')
-        Logger.debug(export)
         if Utils.get_safe_value(export, 'exporting', False):
             self._dialog.ok(self._addon_name, self._common_addon.getLocalizedString(32059) + ' ' + self._common_addon.getLocalizedString(32038))
         else:
@@ -403,9 +454,6 @@ class CloudDriveAddon(RemoteProcessCallable):
                 self._dialog.ok(self._addon_name, error)
             export['exporting'] = False
             export_manager.save()
-
-    def _clean_export(self, driveid, folder, export_folder,items_info):
-        pass
 
     def __export_folder(self, driveid, folder, export_folder, export, items_info):
         folder_id = Utils.str(folder['id'])
