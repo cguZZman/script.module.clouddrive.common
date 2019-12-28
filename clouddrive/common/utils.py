@@ -116,4 +116,14 @@ class Utils:
     @staticmethod
     def get_mimetype_by_extension(extension):
         return Utils.get_safe_value(Utils._extension_map, Utils.default(extension, ''))
-    
+
+    @staticmethod
+    def remove_folder(folder_path, system_monitor=None):
+        from clouddrive.common.ui.utils import KodiUtils
+        if not KodiUtils.rmdir(folder_path, True):
+            if not system_monitor:
+                system_monitor=KodiUtils.get_system_monitor()
+            if system_monitor.waitForAbort(3):
+                return False
+            return KodiUtils.rmdir(folder_path, True)
+        return True

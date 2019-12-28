@@ -74,3 +74,10 @@ class DownloadServiceUtil(object):
             DownloadService.name,
             driveid, item_driveid, item_id, name
         )
+
+    @staticmethod
+    def download_item(driveid, item, item_name):
+        item_id = Utils.str(item['id'])
+        item_drive_id = Utils.default(Utils.get_safe_value(item, 'drive_id'), driveid)
+        content = DownloadServiceUtil.build_download_url(driveid, item_drive_id, item_id, item_name)
+        return content

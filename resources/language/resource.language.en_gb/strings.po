@@ -353,13 +353,5 @@ msgid "Destination"
 msgstr ""
 
 msgctxt "#32086"
-msgid "Clean Redundant"
-msgstr ""
-
-msgctxt "#32087"
-msgid "cleanup"
-msgstr ""
-
-msgctxt "#32088"
-msgid "cleaning"
+msgid "Do you want to keep the local files of '%s'?"
 msgstr ""

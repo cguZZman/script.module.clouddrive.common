@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<addon id="script.module.clouddrive.common" name="Cloud Drive Common Module" version="1.2.8" provider-name="Carlos Guzman (cguZZman)">
+<addon id="script.module.clouddrive.common" name="Cloud Drive Common Module" version="1.3.0" provider-name="Carlos Guzman (cguZZman), Fatih Ka. (xybydy)">
 	<requires>
 		<import addon="xbmc.python" version="2.25.0" />
 		<import addon="script.module.dateutil"/>
@@ -17,6 +17,11 @@
 		<source>https://github.com/cguZZman/script.module.clouddrive.common</source>
 		<forum>https://github.com/cguZZman/script.module.clouddrive.common/issues</forum>
 		<news>
+v1.3.0 released Dec 28, 2019:
+- Option to export '.nfo' files
+- Option to remove exported local files
+- Ability to automatically update the 'watched' folder. Add, rename, remove functions works properly now.
+- '.zip' files removed from the export list
 v1.2.8 released Sep 20, 2018:
 - Resume points and watched status for strm files in library
 v1.2.7 released Sep 12, 2018:

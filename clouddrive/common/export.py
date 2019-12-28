@@ -21,7 +21,6 @@
 
 from __future__ import unicode_literals
 
-
 import json
 import os
 import urllib
@@ -69,8 +68,15 @@ class ExportManager(object):
             with open(self._config_path, 'wb') as fo:
                 fo.write(json.dumps(self.exports, sort_keys=True, indent=4))
 
-    def remove_export(self, exportid):
+    def remove_export(self, exportid, keep_local=True):
         self.load()
+        export = self.exports[exportid]
+        path = os.path.join(export['destination_folder'], export['name'],'')
+        if not keep_local:
+            if KodiUtils.file_exists(path):
+                Utils.remove_folder(path)
+            if self.get_items_info_path(exportid):
+                KodiUtils.file_delete(self.get_items_info_path(exportid))
         del self.exports[exportid]
         self.save()
 
@@ -87,20 +93,13 @@ class ExportManager(object):
         return items_info
 
     @staticmethod
-    def add_item_info(items_info, item_id, name, full_local_path, parent):
-        items_info[item_id] = {'name': name, 'full_local_path': full_local_path, 'parent': parent}
+    def add_item_info(items_info, item_id, name, full_local_path, parent, item_type):
+        items_info[item_id] = {'name': name, 'full_local_path': full_local_path, 'parent': parent,'type':item_type}
 
     @staticmethod
     def remove_item_info(items_info, item_id):
         if item_id in items_info:
             del items_info[item_id]
-
-    @staticmethod
-    def download_item(driveid, item, item_name):
-        item_id = Utils.str(item['id'])
-        item_drive_id = Utils.default(Utils.get_safe_value(item, 'drive_id'), driveid)
-        content = DownloadServiceUtil.build_download_url(driveid, item_drive_id, item_id, item_name)
-        return content
 
     @staticmethod
     def create_strm(driveid, item, file_path, content_type, addon_url):
@@ -125,8 +124,7 @@ class ExportManager(object):
     @staticmethod
     def create_nfo(driveid, item, item_name, nfo_path):
         item_enc = urllib.quote_plus(item_name.encode('utf-8'))
-        dl_url = ExportManager.download_item(driveid, item, item_enc)
-        Logger.notice("Bilgi: %s"%dl_url)
+        dl_url = DownloadServiceUtil.download_item(driveid, item, item_enc)
         try:
             response = Request(dl_url, None).request()
         except:
