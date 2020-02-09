@@ -511,7 +511,7 @@ class CloudDriveAddon(RemoteProcessCallable):
                 if 'url' in item:
                     url = item['url']
                 else:
-                    url = DownloadServiceUtil.build_download_url(driveid, item_driveid, item_id, urllib.quote(Utils.str(item_name)))
+                    url = self._get_item_play_url(urllib.quote(Utils.str(item_name)), driveid, item_driveid, item_id)
                 if 'image' in item:
                     info.update(item['image'])
                 list_item.setInfo('pictures', info)
@@ -651,7 +651,7 @@ class CloudDriveAddon(RemoteProcessCallable):
         if find_subtitles and 'subtitles' in item:
             subtitles = []
             for subtitle in item['subtitles']:
-                subtitles.append(DownloadServiceUtil.build_download_url(driveid, Utils.default(Utils.get_safe_value(subtitle, 'drive_id'), driveid), subtitle['id'], urllib.quote(Utils.str(subtitle['name']))))
+                subtitles.append(self._get_item_play_url(urllib.quote(Utils.str(subtitle['name'])), driveid, Utils.default(Utils.get_safe_value(subtitle, 'drive_id'), driveid), subtitle['id']))
             list_item.setSubtitles(subtitles)
         if not self.cancel_operation():
             xbmcplugin.setResolvedUrl(self._addon_handle, succeeded, list_item)
