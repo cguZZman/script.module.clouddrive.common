@@ -16,6 +16,9 @@
 		<license>GNU GENERAL PUBLIC LICENSE. Version 3, 29 June 2007</license>
 		<source>https://github.com/cguZZman/script.module.clouddrive.common</source>
 		<forum>https://github.com/cguZZman/script.module.clouddrive.common/issues</forum>
+		<assets>
+			<icon>icon.png</icon>
+		</assets>
 		<news>
 v1.2.9 released Feb 10, 2020:
 - Fix playback
