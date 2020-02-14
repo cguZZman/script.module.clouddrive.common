@@ -214,7 +214,7 @@ class CloudDriveAddon(RemoteProcessCallable):
         while not self.cancel_operation() and max_waiting_time > time.time():
             remaining = round(max_waiting_time-time.time())
             percent = int(remaining/self._DEFAULT_SIGNIN_TIMEOUT*100)
-            self._pin_dialog.update(percent, line3='[CR]'+self._common_addon.getLocalizedString(32011) % str(int(remaining)))
+            self._pin_dialog.update(percent, line3='[CR]'+self._common_addon.getLocalizedString(32011) % str(int(remaining)) + '[CR][CR]Your source id is: %s' % Utils.get_source_id(self._ip_before_pin))
             if int(remaining) % 5 == 0 or remaining == 1:
                 tokens_info = provider.fetch_tokens_info(pin_info, request_params = request_params)
                 if self.cancel_operation() or tokens_info:
@@ -651,7 +651,7 @@ class CloudDriveAddon(RemoteProcessCallable):
         if find_subtitles and 'subtitles' in item:
             subtitles = []
             for subtitle in item['subtitles']:
-                subtitles.append(self._get_item_play_url(urllib.quote(Utils.str(subtitle['name'])), driveid, Utils.default(Utils.get_safe_value(subtitle, 'drive_id'), driveid), subtitle['id']))
+                subtitles.append(self._get_item_play_url(urllib.quote(Utils.str(subtitle['name'])), driveid, Utils.default(Utils.get_safe_value(subtitle, 'drive_id'), driveid), subtitle['id'], True))
             list_item.setSubtitles(subtitles)
         if not self.cancel_operation():
             xbmcplugin.setResolvedUrl(self._addon_handle, succeeded, list_item)
