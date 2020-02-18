@@ -13,7 +13,7 @@
 		<description lang="en_GB">Common Services and Classes for all the cloud drive addons.</description>
 		<summary lang="he_IL">מודול משותף לכונן בענן</summary>
 		<description lang="he_IL">שירותים ושירותים משותפים לכל התוספים של כונן הענן.</description>		
-		<license>GNU GENERAL PUBLIC LICENSE. Version 3, 29 June 2007</license>
+		<license>SPDX-License-Identifier: GPL-3.0-or-later</license>
 		<source>https://github.com/cguZZman/script.module.clouddrive.common</source>
 		<forum>https://github.com/cguZZman/script.module.clouddrive.common/issues</forum>
 		<assets>
