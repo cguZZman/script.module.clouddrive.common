@@ -597,7 +597,7 @@ class CloudDriveAddon(RemoteProcessCallable):
         elif self.cancel_operation():
             Logger.debug('Abort requested...')
             
-    def _get_item_play_url(self, file_name, driveid, item_driveid=None, item_id=None):
+    def _get_item_play_url(self, file_name, driveid, item_driveid=None, item_id=None, is_subtitle=False):
         return DownloadServiceUtil.build_download_url(driveid, item_driveid, item_id, urllib.quote(Utils.str(file_name)))
     
     def play(self, driveid, item_driveid=None, item_id=None):
