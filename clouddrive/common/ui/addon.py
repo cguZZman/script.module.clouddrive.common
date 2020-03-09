@@ -439,7 +439,7 @@ class CloudDriveAddon(RemoteProcessCallable):
                     continue
                 ExportManager.create_strm(driveid, item, file_path, export['content_type'], self._addon_url)
                 ExportManager.add_item_info(items_info, item_id, item_name, file_path, folder_id,'file')
-            elif export['nfo_export'] and ('nfo' in item_name_extension or 'text/x-nfo' in item.get("mimetype")):
+            elif 'nfo_export' in export and export['nfo_export'] and ('nfo' in item_name_extension or 'text/x-nfo' in item.get("mimetype")):
                 nfo_path = os.path.join(folder_path, Utils.unicode(item_name))
                 if self._addon.getSetting('skip_unmodified') and KodiUtils.file_exists(nfo_path) and KodiUtils.file(nfo_path).size() == item["size"]:
                     continue

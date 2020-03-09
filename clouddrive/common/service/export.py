@@ -224,7 +224,7 @@ class ExportService(object):
                 item_name_extension = change['name_extension']
                 is_stream_file = (('video' in change or item_name_extension in self._video_file_extensions) and content_type == 'video') or ('audio' in change and content_type == 'audio')
                 item_type = 'folder' if is_folder else 'file'
-                if is_folder or is_stream_file or (export['nfo_export'] and ('nfo' in item_name_extension or 'text/x-nfo' in change.get("mimetype"))):
+                if is_folder or is_stream_file or ('nfo_export' in export and export['nfo_export'] and ('nfo' in item_name_extension or 'text/x-nfo' in change.get("mimetype"))):
                     change_type = 'add'
                     Logger.debug('Change is new item')
                     parent_item_info = items_info[parent_id]
