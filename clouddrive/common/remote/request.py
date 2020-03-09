@@ -54,7 +54,7 @@ class Request(object):
     response_text = None
     response_cookies = None
     
-    def __init__(self, url, data, headers=None, tries=3, delay=5, backoff=2, exceptions=None, before_request=None, on_exception=None, on_failure=None, on_success=None, on_complete=None, cancel_operation=None, waiting_retry=None, wait=None, read_content=True):
+    def __init__(self, url, data, headers=None, tries=4, delay=5, backoff=2, exceptions=None, before_request=None, on_exception=None, on_failure=None, on_success=None, on_complete=None, cancel_operation=None, waiting_retry=None, wait=None, read_content=True):
         self.url = url
         self.data = data
         self.headers = headers
@@ -131,6 +131,7 @@ class Request(object):
                 self.success = True
                 break
             except self.exceptions as e:
+                Logger.debug('current_tries: ' + str(self.current_tries) + ' maximum tries: ' + str(self.tries) + ' i: ' + str(i))
                 root_exception = e
                 response_report = '\nResponse <Exception>: ' 
                 if isinstance(e, urllib2.HTTPError):
@@ -160,7 +161,7 @@ class Request(object):
                     current_time = time.time()
                 self.current_delay *= self.backoff
             finally:
-                Logger.debug(response_report);
+                Logger.debug(response_report)
                 if response:
                     response.close()
         if self.success and self.on_success:
