@@ -91,7 +91,7 @@ class OAuth2(object):
         if not access_tokens:
             access_tokens = self.get_access_tokens()
         self._validate_access_tokens(access_tokens, url, data, headers)
-        if time.time() > (access_tokens['date'] + access_tokens['expires_in']):
+        if time.time() > (access_tokens['date'] + access_tokens['expires_in'] - 600):
             access_tokens.update(self.refresh_access_tokens(request_params))
             self._validate_access_tokens(access_tokens, 'refresh_access_tokens', 'Unknown', 'Unknown')
             self.persist_access_tokens(access_tokens)

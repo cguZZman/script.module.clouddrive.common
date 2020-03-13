@@ -113,6 +113,7 @@ class Request(object):
             request_report += '\nRequest headers: ' + Utils.str(self.get_headers_for_report(self.headers))
             response_report = '<response_not_set>'
             response = None
+            rex = None
             try:
                 Logger.debug(request_report)
                 req = urllib2.Request(self.url, self.data, self.headers)
@@ -131,7 +132,7 @@ class Request(object):
                 self.success = True
                 break
             except self.exceptions as e:
-                Logger.debug('current_tries: ' + str(self.current_tries) + ' maximum tries: ' + str(self.tries) + ' i: ' + str(i))
+                Logger.debug('Exception...')
                 root_exception = e
                 response_report = '\nResponse <Exception>: ' 
                 if isinstance(e, urllib2.HTTPError):
@@ -140,11 +141,19 @@ class Request(object):
                 else:
                     response_report += Utils.str(e)
                 rex = RequestException(Utils.str(e), root_exception, request_report, response_report)
+            finally:
+                Logger.debug(response_report)
+                if response:
+                    response.close()
+            if rex:
                 if self.on_exception:
+                    Logger.debug('calling self.on_exception...')
                     self.on_exception(self, rex)
                 if self.cancel_operation and self.cancel_operation():
                     break
+                Logger.debug('current_tries: ' + str(self.current_tries) + ' maximum tries: ' + str(self.tries) + ' i: ' + str(i))
                 if self.current_tries == self.tries:
+                    Logger.debug('max retries reached')
                     if self.on_failure:
                         self.on_failure(self)
                     if self.on_complete:
@@ -153,17 +162,17 @@ class Request(object):
                     raise rex
                 current_time = time.time()
                 max_waiting_time = current_time + self.current_delay
+                Logger.debug('current_delay: ' + str(self.current_delay) + ' seconds. Waiting...')
                 while (not self.cancel_operation or not self.cancel_operation()) and max_waiting_time > current_time:
                     remaining = round(max_waiting_time-current_time)
                     if self.waiting_retry:
+                        Logger.debug('calling self.waiting_retry...')
                         self.waiting_retry(self, remaining)
                     self.wait(1)
                     current_time = time.time()
+                Logger.debug('Done waiting.')
                 self.current_delay *= self.backoff
-            finally:
-                Logger.debug(response_report)
-                if response:
-                    response.close()
+            
         if self.success and self.on_success:
             self.on_success(self)
         if self.on_complete:
