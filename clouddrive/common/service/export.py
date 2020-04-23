@@ -187,13 +187,14 @@ class ExportService(object):
         Logger.debug('Change: %s' % Utils.str(change))
         if changed_item_id != export['id']:
             changed_item_name = Utils.get_safe_value(change,'name','')
-            deleted = Utils.get_safe_value(change, 'removed')
+            changed_item_extension = Utils.get_safe_value(change,'name_extension','')
+            changed_item_mimetype = Utils.get_safe_value(change,'mimetype','')
+            deleted = Utils.get_safe_value(change, 'deleted') or Utils.get_safe_value(change, 'removed')
             parent_id = Utils.get_safe_value(change,'parent','')
             if changed_item_id in items_info:
                 item_info = items_info[changed_item_id]
                 item_type = item_info['type']
                 is_folder = item_type == 'folder'
-                Logger.debug('item_info: %s' % Utils.str(item_info))
                 item_info_path = item_info['full_local_path']
                 if KodiUtils.file_exists(item_info_path):
                     if deleted:
@@ -207,6 +208,9 @@ class ExportService(object):
                             new_path = os.path.join(parent_item_path, Utils.unicode(changed_item_name))
                             if is_folder:
                                 new_path = os.path.join(new_path, '')
+                            else:
+                                if changed_item_extension in self._video_file_extensions or 'video' in changed_item_mimetype or 'video' in change:
+                                    new_path +='.strm'
                             if KodiUtils.file_rename(item_info_path, new_path):
                                 ExportManager.remove_item_info(items_info, changed_item_id)
                                 ExportManager.add_item_info(items_info, changed_item_id, Utils.unicode(changed_item_name), new_path, parent_id,item_type)
@@ -219,7 +223,7 @@ class ExportService(object):
                     Logger.debug('Invalid state. Changed item not found: %s. Deleting from item list.' % item_info_path)
                     change_type = self.process_change_delete(items_info, changed_item_id, is_folder)
             elif parent_id in items_info and not deleted:
-                is_folder = 'application/vnd.google-apps.folder' in change.get('mimetype')
+                is_folder = 'application/vnd.google-apps.folder' in Utils.get_safe_value(change, 'mimetype', '')
                 content_type = export['content_type']
                 item_name_extension = change['name_extension']
                 is_stream_file = (('video' in change or item_name_extension in self._video_file_extensions) and content_type == 'video') or ('audio' in change and content_type == 'audio')
