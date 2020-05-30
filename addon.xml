@@ -14,8 +14,8 @@
 		<summary lang="he_IL">מודול משותף לכונן בענן</summary>
 		<description lang="he_IL">שירותים ושירותים משותפים לכל התוספים של כונן הענן.</description>		
 		<license>GPL-3.0-or-later</license>
-		<source>https://github.com/cguZZman/script.module.clouddrive.common</source>
-		<forum>https://github.com/cguZZman/script.module.clouddrive.common/issues</forum>
+		<source>https://github.com/laseryuan/script.module.clouddrive.common</source>
+		<forum>https://github.com/laseryuan/script.module.clouddrive.common/issues</forum>
 		<assets>
 			<icon>icon.png</icon>
 		</assets>
