@@ -511,6 +511,7 @@ class CloudDriveAddon(RemoteProcessCallable):
                     info.update(item['audio'])
                     info_type = 'music'
                 elif 'video' in item:
+                    info['plot'] = Utils.get_safe_value(item, 'description')
                     list_item.addStreamInfo('video', item['video'])
                 list_item.setInfo(info_type, info)
                 if 'thumbnail' in item:
