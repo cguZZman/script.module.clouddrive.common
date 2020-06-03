@@ -96,7 +96,10 @@ class OAuth2(object):
             self._validate_access_tokens(access_tokens, 'refresh_access_tokens', 'Unknown', 'Unknown')
             self.persist_access_tokens(access_tokens)
         headers['authorization'] = 'Bearer ' + access_tokens['access_token']
-        return Request(url, data, headers, **request_params) 
+        req = Request(url, data, headers, **request_params)
+        if method == 'delete':
+            req.method = 'delete'
+        return req
     
     def request(self, method, path, parameters=None, request_params=None, access_tokens=None, headers=None):
         return self.prepare_request(method, path, parameters, request_params, access_tokens, headers).request_json()
