@@ -21,8 +21,6 @@ import xbmcgui, xbmcvfs
 from clouddrive.common.ui.utils import KodiUtils
 from clouddrive.common.utils import Utils
 import os
-from clouddrive.common.ui.logger import Logger
-from clouddrive.common.account import AccountManager
 from clouddrive.common.export import ExportManager
 import urllib
 
@@ -287,9 +285,8 @@ class ExportMainDialog(xbmcgui.WindowXMLDialog):
         self.schedule_label.setLabel(self._common_addon.getLocalizedString(32083))
         
         self.title_label.setLabel(self._addon_name + ' - ' + self._common_addon.getLocalizedString(32004))
-        self.account_manager.load()
-        account = self.account_manager.get_account_by_driveid(self.driveid)
-        drive = self.account_manager.get_drive_by_driveid(self.driveid)
+        account = self.account_manager.get_by_driveid('account', self.driveid)
+        drive = self.account_manager.get_by_driveid('drive', self.driveid, account)
         drive_name = self.account_manager.get_account_display_name(account, drive, self.provider, True)
         self.drive_name_label.setLabel(drive_name)
         self.drive_folder_label.setLabel(self.name)

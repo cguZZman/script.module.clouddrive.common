@@ -48,6 +48,7 @@ class Cache(object):
             KodiUtils.mkdirs(profile_path)
         db = KodiUtils.translate_path("%s/cache_%s.db" % (profile_path, self._name,))
         con = sqlite3.connect(db, timeout=30, isolation_level=None)
+        con.execute('pragma journal_mode=wal;')
         rs = con.execute("select name from sqlite_master where type='table' AND name='cache'")
         if not rs.fetchone():
             try:
@@ -82,7 +83,12 @@ class Cache(object):
     def clear(self):
         self._execute_sql("delete from cache")
         Logger.debug("Cache '%s' cleared" % self._name)
+        self.checkpoint()
 
+    def checkpoint(self):
+        row = self._execute_sql("PRAGMA wal_checkpoint(TRUNCATE)")
+        Logger.debug("Db '%s' checkpoint: %s, %s, %s" % (self._name, row[0], row[1], row[2],))
+        
     def _read(self, key):
         return self._execute_sql("select value, expiration from cache where key = ?", (key,))
         

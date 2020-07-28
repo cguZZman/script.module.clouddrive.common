@@ -28,7 +28,6 @@ import urlparse
 
 from clouddrive.common.account import AccountManager, AccountNotFoundException, \
     DriveNotFoundException
-from clouddrive.common.cache.cache import Cache
 from clouddrive.common.exception import UIException, ExceptionUtils, RequestException
 from clouddrive.common.export import ExportManager
 from clouddrive.common.remote.errorreport import ErrorReport
@@ -44,6 +43,7 @@ import xbmcgui
 import xbmcplugin
 import xbmcvfs
 from datetime import timedelta, datetime
+from clouddrive.common.cache.cache import Cache
 
 
 class CloudDriveAddon(RemoteProcessCallable):
@@ -145,7 +145,7 @@ class CloudDriveAddon(RemoteProcessCallable):
         return self._account_manager.get_account_display_name(account, drive, self.get_provider(), with_format)
     
     def get_accounts(self, with_format=False):
-        accounts = self._account_manager.load()
+        accounts = self._account_manager.get_accounts()
         for account_id in accounts:
             account = accounts[account_id]
             for drive in account['drives']:
@@ -248,7 +248,7 @@ class CloudDriveAddon(RemoteProcessCallable):
         self._progress_dialog.update(75, self._common_addon.getLocalizedString(32020))
         try:
             account['access_tokens'] = tokens_info
-            self._account_manager.add_account(account)
+            self._account_manager.save_account(account)
         except Exception as e:
             raise UIException(32021, e)
         if self.cancel_operation():
@@ -256,7 +256,7 @@ class CloudDriveAddon(RemoteProcessCallable):
         
         self._progress_dialog.update(90)
         try:
-            accounts = self._account_manager.load()
+            accounts = self._account_manager.get_accounts()
             for drive in account['drives']:
                 driveid = drive['id']
                 Logger.debug('Looking for account %s...' % driveid)
@@ -276,16 +276,14 @@ class CloudDriveAddon(RemoteProcessCallable):
         KodiUtils.executebuiltin('Container.Refresh')
 
     def _remove_drive(self, driveid):
-        self._account_manager.load()
-        account = self._account_manager.get_account_by_driveid(driveid)
-        drive = self._account_manager.get_drive_by_driveid(driveid)
+        account = self._account_manager.get_by_driveid('account', driveid)
+        drive = self._account_manager.get_by_driveid('drive', driveid, account)
         if self._dialog.yesno(self._addon_name, self._common_addon.getLocalizedString(32023) % self._get_display_name(account, drive, True), None):
-            self._account_manager.remove_drive(driveid)
+            self._account_manager.remove_drive(driveid, account)
             KodiUtils.executebuiltin('Container.Refresh')
     
     def _remove_account(self, driveid):
-        self._account_manager.load()
-        account = self._account_manager.get_account_by_driveid(driveid)
+        account = self._account_manager.get_by_driveid('account', driveid)
         if self._dialog.yesno(self._addon_name, self._common_addon.getLocalizedString(32022) % self._get_display_name(account, with_format=True), None):
             self._account_manager.remove_account(account['id'])
             KodiUtils.executebuiltin('Container.Refresh')
@@ -694,9 +692,8 @@ class CloudDriveAddon(RemoteProcessCallable):
             elif httpex.code >= 400:
                 driveid = Utils.get_safe_value(self._addon_params, 'driveid')
                 if driveid:
-                    self._account_manager.load()
-                    account = self._account_manager.get_account_by_driveid(driveid)
-                    drive = self._account_manager.get_drive_by_driveid(driveid)
+                    account = self._account_manager.get_by_driveid('account', driveid)
+                    drive = self._account_manager.get_by_driveid('drive', driveid, account)
                     if KodiUtils.get_signin_server() in rex.request or httpex.code == 401:
                         send_report = False
                         show_error_dialog = False
