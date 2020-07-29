@@ -45,7 +45,7 @@ class SimpleKeyValueDb(object):
         db = KodiUtils.translate_path("%s/%s.db" % (self._base_path, self._name,))
         con = sqlite3.connect(db, timeout=30, isolation_level=None)
         con.execute("pragma journal_mode=wal")
-        Logger.debug("db [%s] - opened win wal mode" % (self._name, ))
+        Logger.debug("db [%s] - opened in wal mode" % (self._name, ))
         rs = con.execute("select name from sqlite_master where type='table' AND name='store'")
         if not rs.fetchone():
             try:
@@ -56,7 +56,9 @@ class SimpleKeyValueDb(object):
 
     def get(self, key):
         row = self._read(key)
-        return eval(row[0])
+        if row:
+            return eval(row[0])
+        return
     
     def getall(self):
         d = {}

@@ -315,8 +315,8 @@ class CloudDriveAddon(RemoteProcessCallable):
             self._list_folder(driveid, path='/')
 
     def _list_exports(self, driveid):
-        self._export_manager = ExportManager(self._account_manager._addon_data_path)
-        exports = self._export_manager.load()
+        self._export_manager = ExportManager(self._profile_path)
+        exports = self._export_manager.get_exports()
         listing = []
         for exportid in exports:
             export = exports[exportid]
@@ -336,8 +336,8 @@ class CloudDriveAddon(RemoteProcessCallable):
         xbmcplugin.endOfDirectory(self._addon_handle, True)
     
     def _remove_export(self, driveid, item_id):
-        self._export_manager = ExportManager(self._account_manager._addon_data_path)
-        item = self._export_manager.load()[item_id]
+        self._export_manager = ExportManager(self._profile_path)
+        item = self._export_manager.get_exports()[item_id]
         remove_export = self._dialog.yesno(self._addon_name, self._common_addon.getLocalizedString(32001) % Utils.unicode(item['name']))
         if remove_export:
             keep_locals = self._dialog.yesno(self._addon_name, self._common_addon.getLocalizedString(32086) % Utils.unicode(item['name']))
@@ -356,15 +356,15 @@ class CloudDriveAddon(RemoteProcessCallable):
             t.start()
     
     def _run_export(self, driveid, item_id=None):
-        self._export_manager = ExportManager(self._account_manager._addon_data_path)
-        export = self._export_manager.load()[item_id]
+        self._export_manager = ExportManager(self._profile_path)
+        export = self._export_manager.get_exports()[item_id]
         Logger.debug('Running export:')
         Logger.debug(export)
         if Utils.get_safe_value(export, 'exporting', False):
             self._dialog.ok(self._addon_name, self._common_addon.getLocalizedString(32059) + ' ' + self._common_addon.getLocalizedString(32038))
         else:
             export['exporting'] = True
-            self._export_manager.save()
+            self._export_manager.save_export(export)
             export_folder = export['destination_folder']
             if xbmcvfs.exists(export_folder):
                 self.get_provider().configure(self._account_manager, driveid)
@@ -399,7 +399,7 @@ class CloudDriveAddon(RemoteProcessCallable):
                 Logger.debug(error)
                 self._dialog.ok(self._addon_name, error)
             export['exporting'] = False
-            self._export_manager.save()
+            self._export_manager.save_export(export)
 
     def __export_folder(self, driveid, folder, export_folder, export, items_info, root_id):
         folder_id = Utils.str(folder['id'])
@@ -778,7 +778,7 @@ class CloudDriveAddon(RemoteProcessCallable):
             if self._pin_dialog:
                 self._pin_dialog.close()
             if self._exporting:
-                self._export_manager = ExportManager(self._account_manager._addon_data_path)
-                export = self._export_manager.load()[self._exporting]
+                self._export_manager = ExportManager(self._profile_path)
+                export = self._export_manager.get_exports()[self._exporting]
                 export['exporting'] = False
-                self._export_manager.save()
+                self._export_manager.save_export(export)

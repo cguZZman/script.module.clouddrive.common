@@ -241,7 +241,7 @@ class ExportMainDialog(xbmcgui.WindowXMLDialog):
         self.account_manager = kwargs["account_manager"]
         self.provider = kwargs["provider"]
         self.provider.configure(self.account_manager, self.driveid)
-        self.export_manager = ExportManager(self.account_manager._addon_data_path)
+        self.export_manager = ExportManager(self.account_manager.db._base_path)
         self._addon_name = KodiUtils.get_addon_info('name')
         self._common_addon = KodiUtils.get_common_addon()
         self._dialog = xbmcgui.Dialog()
@@ -291,7 +291,7 @@ class ExportMainDialog(xbmcgui.WindowXMLDialog):
         self.drive_name_label.setLabel(drive_name)
         self.drive_folder_label.setLabel(self.name)
         
-        exports = self.export_manager.load()
+        exports = self.export_manager.get_exports()
         export = Utils.get_safe_value(exports, self.item_id, {})
         if export:
             self.editing = True
@@ -316,7 +316,7 @@ class ExportMainDialog(xbmcgui.WindowXMLDialog):
         return True
     
     def save_export(self):
-        self.export_manager.add_export({
+        self.export_manager.save_export({
             'id': self.item_id,
             'item_driveid': self.item_driveid,
             'driveid': self.driveid,

@@ -48,14 +48,14 @@ class ExportService(object):
         del self._account_manager
         
     def cleanup_export_map(self):
-        exports = self.export_manager.load()
+        exports = self.export_manager.get_exports()
         for exportid in exports:
             export = exports[exportid]
             export['exporting'] = False
-        self.export_manager.save()
+            self.export_manager.save_export(export)
     
     def get_export_map(self):
-        exports = self.export_manager.load()
+        exports = self.export_manager.get_exports()
         export_map = {}
         for exportid in exports:
             export = exports[exportid]

@@ -55,7 +55,7 @@ class AccountManager(object):
     
     def get_by_driveid(self, return_type, driveid, account=None, accounts=None):
         if account:
-            accounts = [account]
+            accounts = {account['id'] : account}
         if not accounts:
             accounts = self.get_accounts()
         for accountid in accounts:
@@ -72,7 +72,8 @@ class AccountManager(object):
     
     def save_drive(self, drive, account=None, accounts=None):
         account = self.get_by_driveid('account', drive['id'], account, accounts)
-        index = account['drives'].index(drive)
+        stored_drive = self.get_by_driveid('drive', drive['id'], account, accounts)
+        index = account['drives'].index(stored_drive)
         account['drives'][index] = drive
         self.save_account(account)
         
