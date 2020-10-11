@@ -406,6 +406,9 @@ class CloudDriveAddon(RemoteProcessCallable):
                     context_options.append((self._common_addon.getLocalizedString(32032), 'RunPlugin('+self._addon_url + '?' + urllib.urlencode(params)+')'))
             elif (('video' in item or (item_name_extension and item_name_extension in self._video_file_extensions)) and self._content_type == 'video') or (('audio' in item or (item_name_extension and item_name_extension in self._audio_file_extensions)) and self._content_type == 'audio'):
                 list_item.setProperty('IsPlayable', 'true')
+                params['action'] = 'download'
+                cmd = 'RunPlugin('+self._addon_url + '?' + urllib.urlencode(params)+')'
+                context_options.append((self._common_addon.getLocalizedString(32051), cmd))
                 params['action'] = 'play'
                 url = self._addon_url + '?' + urllib.urlencode(params)
                 info_type = self._content_type
@@ -420,6 +423,9 @@ class CloudDriveAddon(RemoteProcessCallable):
             elif ('image' in item or (item_name_extension and item_name_extension in self._image_file_extensions)) and self._content_type == 'image':
                 Logger.debug('image in item: %s' % (Utils.str('image' in item)),)
                 Logger.debug('item_name_extension in self._image_file_extensions: %s' % (Utils.str(item_name_extension in self._image_file_extensions),))
+                params['action'] = 'download'
+                cmd = 'RunPlugin('+self._addon_url + '?' + urllib.urlencode(params)+')'
+                context_options.append((self._common_addon.getLocalizedString(32051), cmd))
                 if 'url' in item:
                     url = item['url']
                 else:
@@ -452,6 +458,22 @@ class CloudDriveAddon(RemoteProcessCallable):
             if self.cancel_operation():
                 return
             self._process_items(items, driveid)
+    
+    def download(self, driveid, item_driveid=None, item_id=None):
+        dest_folder = self._dialog.browse(0, self._common_addon.getLocalizedString(32002), 'files')
+        if dest_folder:
+            provider = self.get_provider()
+            provider.configure(self._account_manager, driveid)
+            item = provider.get_item(item_driveid, item_id, include_download_info=True)
+            name = Utils.get_safe_value(item,'name', item['id'])
+            download_path = os.path.join(dest_folder, Utils.unicode(name))
+            download_size = Utils.get_safe_value(item, 'size', 0)
+            on_update_download = lambda request: self._progress_dialog_bg.update(int(1.0*request.download_progress/download_size*100), self._addon_name, self._common_addon.getLocalizedString(32056) % name)
+            if ExportManager.download(item, download_path, provider, on_update_download = on_update_download):
+                msg = self._common_addon.getLocalizedString(32057) % name
+            else:
+                msg = self._common_addon.getLocalizedString(32087) % name
+            KodiUtils.show_notification(msg)
     
     def new_change_token_slideshow(self, change_token, driveid, item_driveid=None, item_id=None, path=None):
         self.get_provider().configure(self._account_manager, driveid)

@@ -131,23 +131,18 @@ class ExportManager(object):
         return True
 
     @staticmethod
-    def download(item, download_path, provider):
+    def download(item, download_path, provider, on_update_download=None):
         url = item['download_info']['url']
         headers = None
-        f = None
         if provider.download_requires_auth:
             headers = {"Authorization":"Bearer %s"%provider.get_access_tokens()['access_token']}
         try:
-            response = Request(url, None, headers).request()
-            f = KodiUtils.file(download_path, 'wb')
-            f.write(response)
+            req = Request(url, None, headers, download_path = download_path, on_update_download = on_update_download)
+            req.request()
         except Exception as e:
             ErrorReport.handle_exception(e)
             return False
-        finally:
-            if f:
-                f.close()
-        return True
+        return req.success
 
     
                 
