@@ -28,6 +28,8 @@ from clouddrive.common.ui.logger import Logger
 from clouddrive.common.ui.utils import KodiUtils
 from clouddrive.common.utils import Utils
 from clouddrive.common.db import SimpleKeyValueDb
+from _collections import deque
+from clouddrive.common.remote.errorreport import ErrorReport
 
 
 class ExportManager(object):
@@ -89,6 +91,12 @@ class ExportManager(object):
 
     def save_items_info(self, exportid, items_info):
         self.export_items_db.set(exportid, items_info)
+    
+    def get_pending_changes(self, exportid):
+        return deque(Utils.default(self.export_items_db.get('pending-' + exportid), []))
+
+    def save_pending_changes(self, exportid, changes):
+        self.export_items_db.set('pending-' + exportid, list(changes))
                 
     @staticmethod
     def add_item_info(items_info, item_id, name, full_local_path, parent, item_type):
@@ -100,19 +108,22 @@ class ExportManager(object):
             del items_info[item_id]
 
     @staticmethod
-    def create_strm(driveid, item, file_path, content_type, addon_url):
+    def get_strm_link(driveid, item, content_type, addon_url):
         item_id = Utils.str(item['id'])
         item_drive_id = Utils.default(Utils.get_safe_value(item, 'drive_id'), driveid)
+        content = addon_url + '?' + urllib.urlencode(
+                {'action': 'play', 'content_type': content_type, 'item_driveid': item_drive_id, 'item_id': item_id,
+                 'driveid': driveid})
+        return Utils.str(content)
+    
+    @staticmethod
+    def create_text_file(file_path, content):
         f = None
         try:
             f = KodiUtils.file(file_path, 'w')
-            content = addon_url + '?' + urllib.urlencode(
-                {'action': 'play', 'content_type': content_type, 'item_driveid': item_drive_id, 'item_id': item_id,
-                 'driveid': driveid})
-            if item['name_extension'] == 'strm':
-                content = Request(item['download_info']['url'], None).request()
-            f.write(str(content))
-        except:
+            f.write(Utils.str(content))
+        except Exception as e:
+            ErrorReport.handle_exception(e)
             return False
         finally:
             if f:
@@ -120,20 +131,18 @@ class ExportManager(object):
         return True
 
     @staticmethod
-    def create_nfo(item_id, item_driveid, nfo_path, provider):
-        url = provider.get_item(item_driveid=item_driveid, item_id=item_id, include_download_info = True)["download_info"]["url"]
-        headers = {"Authorization":"Bearer %s"%provider.get_access_tokens()['access_token']}
+    def download(item, download_path, provider):
+        url = item['download_info']['url']
+        headers = None
+        f = None
+        if provider.download_requires_auth:
+            headers = {"Authorization":"Bearer %s"%provider.get_access_tokens()['access_token']}
         try:
             response = Request(url, None, headers).request()
-        except:
-            Logger.error('Error on request to: %s' % url)
-            return False
-        f = None
-        try:
-            f=KodiUtils.file(nfo_path,'w')
+            f = KodiUtils.file(download_path, 'wb')
             f.write(response)
-        except Exception as err:
-            Logger.error(err)
+        except Exception as e:
+            ErrorReport.handle_exception(e)
             return False
         finally:
             if f:

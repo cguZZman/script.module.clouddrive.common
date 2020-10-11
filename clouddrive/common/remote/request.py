@@ -128,7 +128,11 @@ class Request(object):
                     self.response_text = response.read()
                 content_length = self.response_info.getheader('content-length', -1)
                 response_report = '\nResponse Headers:\n%s' % Utils.str(self.response_info)
-                response_report += '\nResponse (%d) content-length=%s, len=<%s>:\n%s' % (self.response_code, content_length, len(self.response_text), self.response_text)
+                response_report += '\nResponse (%d) content-length=%s, len=<%s>:\n' % (self.response_code, content_length, len(self.response_text),)
+                try:
+                    response_report += Utils.str(self.response_text)
+                except:
+                    response_report += '<possible binary content>'
                 self.success = True
                 break
             except self.exceptions as e:
@@ -136,13 +140,17 @@ class Request(object):
                 root_exception = e
                 response_report = '\nResponse <Exception>: ' 
                 if isinstance(e, urllib2.HTTPError):
+                    self.response_code = e.code
                     self.response_text = Utils.str(e.read())
                     response_report += self.response_text
                 else:
                     response_report += Utils.str(e)
                 rex = RequestException(Utils.str(e), root_exception, request_report, response_report)
             finally:
-                Logger.debug(response_report)
+                try:
+                    Logger.debug(response_report)
+                except:
+                    Logger.debug('unable to print response_report')
                 if response:
                     response.close()
             if rex:

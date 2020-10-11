@@ -233,15 +233,7 @@ msgid "Resume from %s"
 msgstr ""
 
 msgctxt "#32055"
-msgid "-unused- Special: Photos"
-msgstr ""
-
-msgctxt "#32056"
-msgid "-unused- Special: Music"
-msgstr ""
-
-msgctxt "#32057"
-msgid "-unused- Shared By Me"
+msgid "Export will start in less than %s seconds"
 msgstr ""
 
 msgctxt "#32058"

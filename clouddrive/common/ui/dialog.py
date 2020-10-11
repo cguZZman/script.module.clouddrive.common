@@ -273,7 +273,7 @@ class ExportMainDialog(xbmcgui.WindowXMLDialog):
         self.dest_folder_button = self.getControl(1006)
         
         self.update_library_sw = self.getControl(1007)
-        self.nfo_export_sw = self.getControl(1008)
+        self.download_artwork_sw = self.getControl(1008)
         self.watch_drive_sw = self.getControl(1009)
         self.schedule_sw = self.getControl(1010)
         
@@ -296,7 +296,7 @@ class ExportMainDialog(xbmcgui.WindowXMLDialog):
         if export:
             self.editing = True
             self.watch_drive_sw.setSelected(Utils.get_safe_value(export, 'watch', False))
-            self.nfo_export_sw.setSelected(Utils.get_safe_value(export, 'nfo_export', False))
+            self.download_artwork_sw.setSelected(Utils.get_safe_value(export, 'download_artwork', False))
             self.schedule_sw.setSelected(Utils.get_safe_value(export, 'schedule', False))
             self.update_library_sw.setSelected(Utils.get_safe_value(export, 'update_library', False))
             self.schedules = Utils.get_safe_value(export, 'schedules', [])
@@ -324,10 +324,11 @@ class ExportMainDialog(xbmcgui.WindowXMLDialog):
             'content_type': self.content_type,
             'destination_folder': self.dest_folder_label.getLabel(),
             'watch': self.watch_drive_sw.isSelected(),
-            'nfo_export':self.nfo_export_sw.isSelected(),
+            'download_artwork':self.download_artwork_sw.isSelected(),
             'schedule': self.schedule_sw.isSelected(),
             'update_library': self.update_library_sw.isSelected(),
-            'schedules': self.schedules
+            'schedules': self.schedules,
+            'run_immediately': self.run
         })
     
     def schedule_enabled(self, enabled):
@@ -384,8 +385,8 @@ class ExportMainDialog(xbmcgui.WindowXMLDialog):
             self.close()
         elif control_id == self.save_button.getId() or control_id == self.save_export_button.getId():
             if self.is_valid_export():
-                self.save_export()
                 self.run = control_id == self.save_export_button.getId()
+                self.save_export()
                 self.close()
                 
         elif control_id == self.dest_folder_button.getId():

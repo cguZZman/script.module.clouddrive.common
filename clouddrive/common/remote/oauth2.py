@@ -48,7 +48,7 @@ class OAuth2(object):
     
     def _on_exception(self, request, e, original_on_exception):
         ex = ExceptionUtils.extract_exception(e, urllib2.HTTPError)
-        if ex and ex.code >= 400 and ex.code <= 599 and ex.code != 503 and ex.code != 403:
+        if ex and ex.code != 503:
             request.tries = request.current_tries
         if original_on_exception and not(original_on_exception is self._on_exception):
             original_on_exception(request, e)

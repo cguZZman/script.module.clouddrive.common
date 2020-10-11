@@ -59,11 +59,7 @@ class CloudDriveAddon(RemoteProcessCallable):
     _cancel_operation = False
     _content_type = None
     _dialog = None
-    _exporting = None
     _export_manager = None
-    _exporting_target = 0
-    _exporting_percent = 0
-    _exporting_count = 0
     _child_count_supported = True
     _auto_refreshed_slideshow_supported = True
     _load_target = 0
@@ -71,7 +67,6 @@ class CloudDriveAddon(RemoteProcessCallable):
     _profile_path = None
     _progress_dialog = None
     _progress_dialog_bg = None
-    _export_progress_dialog_bg = None
     _system_monitor = None
     _video_file_extensions = [x for x in KodiUtils.get_supported_media("video") if x not in ('','zip')]
     _audio_file_extensions = KodiUtils.get_supported_media("music")
@@ -93,7 +88,6 @@ class CloudDriveAddon(RemoteProcessCallable):
         self._profile_path = Utils.unicode(KodiUtils.translate_path(self._addon.getAddonInfo('profile')))
         self._progress_dialog = DialogProgress(self._addon_name)
         self._progress_dialog_bg = DialogProgressBG(self._addon_name)
-        self._export_progress_dialog_bg = DialogProgressBG(self._addon_name)
         self._system_monitor = KodiUtils.get_system_monitor()
         self._account_manager = AccountManager(self._profile_path)
         self._pin_dialog = None
@@ -125,7 +119,6 @@ class CloudDriveAddon(RemoteProcessCallable):
         del self._dialog
         del self._progress_dialog
         del self._progress_dialog_bg
-        del self._export_progress_dialog_bg
         del self._system_monitor
         del self._account_manager
         
@@ -351,105 +344,8 @@ class CloudDriveAddon(RemoteProcessCallable):
         export_dialog = ExportMainDialog.create(self._content_type, driveid, item_driveid, item_id, name, self._account_manager, self.get_provider())
         export_dialog.doModal()
         if export_dialog.run:
-            t = threading.Thread(target=self._run_export, args=(driveid, item_id,))
-            t.setDaemon(True)
-            t.start()
+            KodiUtils.show_notification(self._common_addon.getLocalizedString(32055) % '60')
     
-    def _run_export(self, driveid, item_id=None):
-        self._export_manager = ExportManager(self._profile_path)
-        export = self._export_manager.get_exports()[item_id]
-        Logger.debug('Running export:')
-        Logger.debug(export)
-        if Utils.get_safe_value(export, 'exporting', False):
-            self._dialog.ok(self._addon_name, self._common_addon.getLocalizedString(32059) + ' ' + self._common_addon.getLocalizedString(32038))
-        else:
-            export['exporting'] = True
-            self._export_manager.save_export(export)
-            export_folder = export['destination_folder']
-            if xbmcvfs.exists(export_folder):
-                self.get_provider().configure(self._account_manager, driveid)
-                self._export_progress_dialog_bg.create(self._addon_name + ' ' + self._common_addon.getLocalizedString(32024), self._common_addon.getLocalizedString(32025))
-                self._export_progress_dialog_bg.update(0)
-                item = self.get_provider().get_item(export['item_driveid'], item_id)
-                if self.cancel_operation():
-                    return
-                if self._child_count_supported:
-                    self._exporting_target = int(item['folder']['child_count'])
-                self._exporting_target += 1
-                folder_name = Utils.unicode(item['name'])
-                folder_path = os.path.join(os.path.join(export_folder, folder_name), '')
-                if self._addon.getSetting('clean_folder') != 'true' or not xbmcvfs.exists(folder_path) or Utils.remove_folder(folder_path):
-                    self._exporting = item_id
-                    export_items_info = {}
-                    ExportManager.add_item_info(export_items_info, item_id, folder_name, folder_path, None,'root')
-                    self.__export_folder(driveid, item, export_folder, export, export_items_info, item_id)
-                    self._export_manager.save_items_info(item_id, export_items_info)
-                    if Utils.get_safe_value(export, 'update_library', False) and self._content_type:
-                        database = self._content_type
-                        if database == 'audio':
-                            database = 'music'
-                        KodiUtils.update_library(database)
-                else:
-                    error = self._common_addon.getLocalizedString(32066) % folder_path
-                    Logger.debug(error)
-                    self._dialog.ok(self._addon_name, error)
-                self._export_progress_dialog_bg.close()
-            else:
-                error = self._common_addon.getLocalizedString(32026) % export_folder
-                Logger.debug(error)
-                self._dialog.ok(self._addon_name, error)
-            export['exporting'] = False
-            self._export_manager.save_export(export)
-
-    def __export_folder(self, driveid, folder, export_folder, export, items_info, root_id):
-        folder_id = Utils.str(folder['id'])
-        folder_name = Utils.unicode(folder['name'])
-        folder_path = os.path.join(os.path.join(export_folder, folder_name), '')
-        if not xbmcvfs.exists(folder_path):
-            try:
-                xbmcvfs.mkdirs(folder_path)
-            except:
-                if self._system_monitor.waitForAbort(3):
-                    return
-                xbmcvfs.mkdirs(folder_path)
-        items = self.get_provider().get_folder_items(Utils.default(Utils.get_safe_value(folder, 'drive_id'), driveid), folder['id'])
-        if self.cancel_operation():
-            return
-        for item in items:
-            if 'folder' in item:
-                if self._child_count_supported:
-                    self._exporting_target += int(item['folder']['child_count'])
-                else:
-                    self._exporting_target += 1
-        for item in items:
-            is_folder = 'folder' in item
-            item_id = Utils.str(item['id'])
-            item_name = Utils.unicode(item['name'])
-            item_name_extension = item['name_extension']
-            file_path = os.path.join(folder_path, item_name)
-            if is_folder:
-                ExportManager.add_item_info(items_info, item_id, item_name, os.path.join(file_path, ''), folder_id,'folder')
-                self.__export_folder(driveid, item, folder_path, export, items_info, root_id)
-            elif (('video' in item or item_name_extension in self._video_file_extensions) and export['content_type'] == 'video') or ('audio' in item and export['content_type'] == 'audio'):
-                item_name += ExportManager._strm_extension
-                file_path += ExportManager._strm_extension
-                if self._addon.getSetting('skip_unmodified') and KodiUtils.file_exists(file_path) and KodiUtils.file(file_path).size() == item["size"]:
-                    continue
-                ExportManager.create_strm(driveid, item, file_path, export['content_type'], self._addon_url)
-                ExportManager.add_item_info(items_info, item_id, item_name, file_path, folder_id,'file')
-            elif 'nfo_export' in export and export['nfo_export'] and ('nfo' in item_name_extension or 'text/x-nfo' in item.get("mimetype")):
-                nfo_path = os.path.join(folder_path, Utils.unicode(item_name))
-                if self._addon.getSetting('skip_unmodified') and KodiUtils.file_exists(nfo_path) and KodiUtils.file(nfo_path).size() == item["size"]:
-                    continue
-                ExportManager.create_nfo(item_id, export["item_driveid"], nfo_path, self.get_provider())
-                ExportManager.add_item_info(items_info, item_id, item_name, nfo_path, folder_id,'file')
-            self._export_manager.save_items_info(root_id, items_info)
-            self._exporting_count += 1
-            p = int(self._exporting_count/float(self._exporting_target)*100)
-            if self._exporting_percent < p:
-                self._exporting_percent = p
-            self._export_progress_dialog_bg.update(self._exporting_percent, self._addon_name + ' ' + self._common_addon.getLocalizedString(32024), file_path[len(export['destination_folder']):])  
-        
     def on_items_page_completed(self, items):
         self._load_count += len(items)
         if self._load_target > self._load_count:
@@ -474,6 +370,7 @@ class CloudDriveAddon(RemoteProcessCallable):
     def _process_items(self, items, driveid):
         listing = []
         for item in items:
+            Logger.debug(item)
             item_id = item['id']
             item_name = Utils.unicode(item['name'])
             item_name_extension = item['name_extension']
@@ -500,7 +397,7 @@ class CloudDriveAddon(RemoteProcessCallable):
                 elif self._content_type == 'image' and self._auto_refreshed_slideshow_supported:
                     params['action'] = '_slideshow'
                     context_options.append((self._common_addon.getLocalizedString(32032), 'RunPlugin('+self._addon_url + '?' + urllib.urlencode(params)+')'))
-            elif (('video' in item or item_name_extension in self._video_file_extensions) and self._content_type == 'video') or (('audio' in item or item_name_extension in self._audio_file_extensions) and self._content_type == 'audio'):
+            elif (('video' in item or (item_name_extension and item_name_extension in self._video_file_extensions)) and self._content_type == 'video') or (('audio' in item or (item_name_extension and item_name_extension in self._audio_file_extensions)) and self._content_type == 'audio'):
                 list_item.setProperty('IsPlayable', 'true')
                 params['action'] = 'play'
                 url = self._addon_url + '?' + urllib.urlencode(params)
@@ -513,7 +410,9 @@ class CloudDriveAddon(RemoteProcessCallable):
                 list_item.setInfo(info_type, info)
                 if 'thumbnail' in item:
                     list_item.setArt({'icon': item['thumbnail'], 'thumb': item['thumbnail']})
-            elif ('image' in item or item_name_extension in self._image_file_extensions) and self._content_type == 'image' and item_name_extension != 'mp4':
+            elif ('image' in item or (item_name_extension and item_name_extension in self._image_file_extensions)) and self._content_type == 'image':
+                Logger.debug('image in item: %s' % (Utils.str('image' in item)),)
+                Logger.debug('item_name_extension in self._image_file_extensions: %s' % (Utils.str(item_name_extension in self._image_file_extensions),))
                 if 'url' in item:
                     url = item['url']
                 else:
@@ -774,11 +673,5 @@ class CloudDriveAddon(RemoteProcessCallable):
         finally:
             self._progress_dialog.close()
             self._progress_dialog_bg.close()
-            self._export_progress_dialog_bg.close()
             if self._pin_dialog:
                 self._pin_dialog.close()
-            if self._exporting:
-                self._export_manager = ExportManager(self._profile_path)
-                export = self._export_manager.get_exports()[self._exporting]
-                export['exporting'] = False
-                self._export_manager.save_export(export)

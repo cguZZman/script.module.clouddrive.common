@@ -191,6 +191,7 @@ class Source(BaseHandler):
                             self.get_folder_items(driveid, path[0:path.rfind('/')+1])
                         url = self.get_download_url(driveid, path)
                         headers['location'] = url
+                        Logger.debug('redirect to: ' + url)
                 else:
                     url = self.path + '/'
                     headers['location'] = url

@@ -22,11 +22,13 @@ import time
 from clouddrive.common.remote.oauth2 import OAuth2
 from clouddrive.common.remote.signin import Signin
 from clouddrive.common.utils import Utils
+from __builtin__ import False
 
 
 class Provider(OAuth2):
     name = ''
     source_mode = False
+    download_requires_auth = False
     _signin = Signin()
     _account_manager = None
     _driveid = None
