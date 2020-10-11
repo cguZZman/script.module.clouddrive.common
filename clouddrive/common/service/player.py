@@ -109,7 +109,10 @@ class KodiPlayer(KodiUtils.kodi_player_class()):
                 if dbtype and position and total:
                     position = float(position)
                     total = float(total)
-                    percent = position / total * 100
+                    if total > 0:
+                        percent = position / total * 100
+                    else:
+                        percent = 0
                     details = {}
                     Logger.debug('position is %d of %d = %d percent' % (position, total, percent))
                     if percent >= 90:
