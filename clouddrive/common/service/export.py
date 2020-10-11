@@ -244,7 +244,6 @@ class ExportService(object):
                             changes = self.provider.changes()
                             changes_by_drive[driveid] = []
                             changes_by_drive[driveid].extend(changes)
-                        Logger.debug('changes_by_drive before: %s' % Utils.str(changes_by_drive))
                         pending_changes = self.export_manager.get_pending_changes(exportid)
                         pending_changes.extend(changes)
                         self.export_manager.save_pending_changes(exportid, pending_changes)
@@ -255,7 +254,6 @@ class ExportService(object):
                         for change in changes_done:
                             if change in changes_by_drive[driveid]:
                                 changes_by_drive[driveid].remove(change)
-                        Logger.debug('changes_by_drive after: %s' % Utils.str(changes_by_drive))
                     except Exception as e:
                         ErrorReport.handle_exception(e)
                         KodiUtils.show_notification(self._common_addon.getLocalizedString(32027) + ' ' + Utils.unicode(e))
@@ -361,7 +359,7 @@ class ExportService(object):
         changed_item_name = Utils.get_safe_value(change,'name','')
         changed_item_extension = Utils.get_safe_value(change,'name_extension','')
         parent_id = Utils.get_safe_value(change,'parent','')
-        is_folder = 'application/vnd.google-apps.folder' in Utils.get_safe_value(change, 'mimetype', '')
+        is_folder = 'folder' in change
         item_type = 'folder' if is_folder else 'file'
         parent_item_info = Utils.get_safe_value(items_info,parent_id)
         if parent_item_info:
@@ -419,6 +417,8 @@ class ExportService(object):
                                      or (('audio' in change or (changed_item_extension and changed_item_extension in self._audio_file_extensions)) and content_type == 'audio')
                     if is_stream_file:
                         change_type += '_file'
+                        if KodiUtils.get_addon_setting('no_extension_strm') == 'true':
+                            new_path = Utils.remove_extension(new_path)
                         new_path += ExportManager._strm_extension
                         strm_content = ExportManager.get_strm_link(export['driveid'], change, content_type, 'plugin://%s/' % self.addonid)
                         Logger.debug('creating strm file: %s' % (new_path,))

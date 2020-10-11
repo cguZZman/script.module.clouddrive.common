@@ -328,6 +328,13 @@ class CloudDriveAddon(RemoteProcessCallable):
         xbmcplugin.addDirectoryItems(self._addon_handle, listing, len(listing))
         xbmcplugin.endOfDirectory(self._addon_handle, True)
     
+    def _run_export(self, driveid, item_id):
+        self._export_manager = ExportManager(self._profile_path)
+        export = self._export_manager.get_exports()[item_id]
+        export['run_immediately'] = True
+        self._export_manager.save_export(export)
+        KodiUtils.show_notification(self._common_addon.getLocalizedString(32055) % '60')
+    
     def _remove_export(self, driveid, item_id):
         self._export_manager = ExportManager(self._profile_path)
         item = self._export_manager.get_exports()[item_id]
