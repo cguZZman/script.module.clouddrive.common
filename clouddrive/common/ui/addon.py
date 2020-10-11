@@ -301,6 +301,8 @@ class CloudDriveAddon(RemoteProcessCallable):
             if self._content_type == 'video' or self._content_type == 'audio':
                 url = self._addon_url + '?' + urllib.urlencode({'action':'_list_exports', 'content_type': self._content_type, 'driveid': driveid})
                 listing.append((url, xbmcgui.ListItem(self._common_addon.getLocalizedString(32000)), True))
+            url = self._addon_url + '?' + urllib.urlencode({'action':'_search', 'content_type': self._content_type, 'driveid': driveid})
+            listing.append((url, xbmcgui.ListItem(self._common_addon.getLocalizedString(32039)), True))
             
             xbmcplugin.addDirectoryItems(self._addon_handle, listing, len(listing))
             xbmcplugin.endOfDirectory(self._addon_handle, True)
