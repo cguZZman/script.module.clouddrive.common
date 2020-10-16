@@ -97,6 +97,12 @@ class ExportManager(object):
 
     def save_pending_changes(self, exportid, changes):
         self.export_items_db.set('pending-' + exportid, list(changes))
+
+    def get_retry_changes(self, exportid):
+        return deque(Utils.default(self.export_items_db.get('retry-' + exportid), []))
+
+    def save_retry_changes(self, exportid, changes):
+        self.export_items_db.set('retry-' + exportid, list(changes))
                 
     @staticmethod
     def add_item_info(items_info, item_id, name, full_local_path, parent, item_type):
