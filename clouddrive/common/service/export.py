@@ -137,19 +137,20 @@ class ExportService(object):
         sid = 32024
         if export['origin'] == 'watch':
             sid = 32088
-        return self._common_addon.getLocalizedString(sid) + ': ' + export['name']
+        return self._common_addon.getLocalizedString(sid) + ': ' + Utils.unicode(export['name'])
     
     def _get_percent(self, completed, target):
         if target > 0:
             return completed * 100 / target
         return 0
-    def _show_progress_before_change(self, change, pending_changes, changes_done, retry_changes, export):
-        completed = len(changes_done) + len(retry_changes)
+    
+    def _show_progress_before_change(self, change, pending_changes, changes_done, retry_changes, ignored, export):
+        completed = len(changes_done) + len(retry_changes) + ignored
         target = len(pending_changes) + completed + 1
         self._export_progress_dialog_bg.update(self._get_percent(completed, target), self._addon_name + ' ' + self._get_progress_header(export), Utils.get_safe_value(change,'name','n/a'))
 
-    def _show_progress_after_change(self, change, change_type, pending_changes, changes_done, retry_changes, export):
-        completed = len(changes_done) + len(retry_changes)
+    def _show_progress_after_change(self, change, change_type, pending_changes, changes_done, retry_changes, ignored, export):
+        completed = len(changes_done) + len(retry_changes) + ignored
         target = len(pending_changes) + completed
         msg = self._common_addon.getLocalizedString(32041)
         if change_type:
@@ -164,7 +165,9 @@ class ExportService(object):
             export['origin'] = 'schedule'
             self.export_manager.save_export(export)
             try:
-                self._export_progress_dialog_bg.create(self._addon_name + ' ' + self._common_addon.getLocalizedString(32024), self._common_addon.getLocalizedString(32025))
+                show_export_progress = KodiUtils.get_addon_setting('hide_export_progress') != 'true'
+                if show_export_progress:
+                    self._export_progress_dialog_bg.create(self._addon_name + ' ' + self._common_addon.getLocalizedString(32024), self._common_addon.getLocalizedString(32025))
                 export_folder = export['destination_folder']
                 if not KodiUtils.file_exists(export_folder):
                     Logger.debug('creating folder: %s' % (export_folder,))
@@ -184,7 +187,11 @@ class ExportService(object):
                     })
                     self.export_manager.save_pending_changes(exportid, deque([item]))
                     self.export_manager.save_retry_changes(exportid, deque([]))
-                    self.process_pending_changes(exportid, on_before_change = self._show_progress_before_change)
+                    if show_export_progress:
+                        progress_listener = self._show_progress_before_change
+                    else:
+                        progress_listener = None
+                    self.process_pending_changes(exportid, on_before_change = progress_listener)
                     if Utils.get_safe_value(export, 'update_library', False):
                         if Utils.get_safe_value(export, 'content_type', '') == 'audio':
                             KodiUtils.update_library('music')
@@ -206,17 +213,18 @@ class ExportService(object):
         return self.provider.get_folder_items(Utils.default(Utils.get_safe_value(folder, 'drive_id'), driveid), folder['id'], include_download_info=True, on_before_add_item=on_before_add_item)
     
     def on_before_add_item(self, export, item):
-        item['origin'] = export['origin']
+        item['origin'] = Utils.get_safe_value(export, 'origin', '')
         
     def process_pending_changes(self, exportid, on_after_change = None, on_before_change = None):
         changes_done = []
         pending_changes = self.export_manager.get_pending_changes(exportid)
         if pending_changes:
             export = self.export_manager.get_exports()[exportid]
-            Logger.debug('*** Processing all changes for export "%s" in %s' % (export['name'], export['destination_folder']))
+            Logger.debug('*** Processing all changes for export "%s" in %s' % (Utils.str(export['name']), export['destination_folder']))
             items_info = Utils.default(self.export_manager.get_items_info(exportid), {})
             retry_changes = []
             processed_changes = set()
+            ignored = 0
             while len(pending_changes) > 0:
                 change = pending_changes.popleft()
                 change_id = change['id']
@@ -224,7 +232,7 @@ class ExportService(object):
                     continue
                 processed_changes.add(change_id)
                 if on_before_change:
-                    on_before_change(change, pending_changes, changes_done, retry_changes, export)
+                    on_before_change(change, pending_changes, changes_done, retry_changes, ignored, export)
                 
                 change_type = self.process_change(change, items_info, export)
                 self.export_manager.save_items_info(exportid, items_info)
@@ -241,8 +249,10 @@ class ExportService(object):
                             before_add_item = lambda item: self.on_before_add_item(change, item)
                             pending_changes.extendleft(self.get_folder_changes(export['driveid'], change, before_add_item))
                             self.export_manager.save_pending_changes(exportid, pending_changes)
+                else:
+                    ignored += 1
                 if on_after_change:
-                    on_after_change(change, change_type, pending_changes, changes_done, retry_changes, export)
+                    on_after_change(change, change_type, pending_changes, changes_done, retry_changes, ignored, export)
                 if is_retry:
                     self.export_manager.save_retry_changes(exportid, deque(retry_changes))
         return changes_done
@@ -278,9 +288,14 @@ class ExportService(object):
                             self.export_manager.save_pending_changes(exportid, pending_changes)
                         if len(retry_changes) > 0:
                             self.export_manager.save_retry_changes(exportid, deque([]))
-                        if pending_changes:
+                        show_export_progress = KodiUtils.get_addon_setting('hide_export_progress') != 'true'
+                        if pending_changes and show_export_progress:
                             self._export_progress_dialog_bg.update(0, self._addon_name + ' ' + self._common_addon.getLocalizedString(32088), self._common_addon.getLocalizedString(32025))
-                        changes_done = self.process_pending_changes(exportid, on_after_change = self._show_progress_after_change)
+                        if show_export_progress:
+                            progress_listener = self._show_progress_after_change
+                        else:
+                            progress_listener = None
+                        changes_done = self.process_pending_changes(exportid, on_after_change = progress_listener)
                         if changes_done:
                             if Utils.get_safe_value(export, 'update_library', False):
                                 update_library[Utils.get_safe_value(export, 'content_type', 'None')] = True
