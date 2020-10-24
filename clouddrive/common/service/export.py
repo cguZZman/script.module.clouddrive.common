@@ -135,7 +135,7 @@ class ExportService(object):
     
     def _get_progress_header(self, export):
         sid = 32024
-        if export['origin'] == 'watch':
+        if Utils.get_safe_value(export, 'origin', '') == 'watch':
             sid = 32088
         return self._common_addon.getLocalizedString(sid) + ': ' + Utils.unicode(export['name'])
     
@@ -191,12 +191,13 @@ class ExportService(object):
                         progress_listener = self._show_progress_before_change
                     else:
                         progress_listener = None
-                    self.process_pending_changes(exportid, on_before_change = progress_listener)
-                    if Utils.get_safe_value(export, 'update_library', False):
-                        if Utils.get_safe_value(export, 'content_type', '') == 'audio':
-                            KodiUtils.update_library('music')
-                        else:
-                            KodiUtils.update_library('video')
+                    changes_done = self.process_pending_changes(exportid, on_before_change = progress_listener)
+                    if changes_done:
+                        if Utils.get_safe_value(export, 'update_library', False):
+                            if Utils.get_safe_value(export, 'content_type', '') == 'audio':
+                                KodiUtils.update_library('music')
+                            else:
+                                KodiUtils.update_library('video')
                             
             except Exception as e:
                 ErrorReport.handle_exception(e)
@@ -265,7 +266,8 @@ class ExportService(object):
             export = exports[exportid]
             watch = Utils.get_safe_value(export, 'watch', False)
             exporting = Utils.get_safe_value(export, 'exporting', False)
-            if watch and not exporting:
+            retry_changes = self.export_manager.get_retry_changes(exportid)
+            if (watch or len(retry_changes) > 0) and not exporting:
                 items_info = self.export_manager.get_items_info(exportid)
                 if items_info:
                     export['exporting'] = True
@@ -281,9 +283,8 @@ class ExportService(object):
                             changes_by_drive[driveid] = []
                             changes_by_drive[driveid].extend(changes)
                         pending_changes = self.export_manager.get_pending_changes(exportid)
-                        retry_changes = self.export_manager.get_retry_changes(exportid)
-                        pending_changes.extend(changes)
                         pending_changes.extend(retry_changes)
+                        pending_changes.extend(changes)
                         if len(changes) > 0 or len(retry_changes) > 0:
                             self.export_manager.save_pending_changes(exportid, pending_changes)
                         if len(retry_changes) > 0:
