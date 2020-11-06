@@ -428,7 +428,7 @@ class ExportService(object):
                         Logger.debug(error)
                 if not KodiUtils.file_exists(new_path):
                     Logger.debug('creating folder: %s' % (new_path,))
-                    if not KodiUtils.mkdirs(new_path):
+                    if not KodiUtils.mkdir(new_path):
                         change_type += '_retry'
                         Logger.debug('unable to create folder %s' % (new_path,))
                 else:

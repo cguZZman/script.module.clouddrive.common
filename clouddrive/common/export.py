@@ -82,7 +82,9 @@ class ExportManager(object):
         export = self.exports_db.get(exportid)
         self.exports_db.remove(exportid)
         self.export_items_db.remove(exportid)
-        path = os.path.join(export['destination_folder'], export['name'],'')
+        self.export_items_db.remove('pending-' + exportid)
+        self.export_items_db.remove('retry-' + exportid)
+        path = os.path.join(export['destination_folder'], Utils.unicode(export['name']), '')
         if not keep_local:
             if KodiUtils.file_exists(path):
                 Utils.remove_folder(path)
