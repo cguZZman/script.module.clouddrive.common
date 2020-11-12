@@ -221,7 +221,12 @@ class ExportService(object):
         pending_changes = self.export_manager.get_pending_changes(exportid)
         if pending_changes:
             export = self.export_manager.get_exports()[exportid]
-            Logger.debug('*** Processing all changes for export "%s" in %s' % (Utils.str(export['name']), export['destination_folder']))
+            Logger.debug('*** Processing all changes for export id: %s' % exportid)
+            try:
+                Logger.debug('    Exporting "%s" in %s' % (Utils.unicode(export['name']), Utils.unicode(export['destination_folder'])))
+            except Exception:
+                Logger.debug('    Export name: %s' % Utils.str(export['name']))
+                Logger.debug('    Export destination_folder: %s' % Utils.str(export['destination_folder']))
             items_info = Utils.default(self.export_manager.get_items_info(exportid), {})
             retry_changes = []
             processed_changes = set()
@@ -385,7 +390,7 @@ class ExportService(object):
         item_type = item_info['type']
         is_folder = item_type == 'folder'
         item_info_path = item_info['full_local_path']
-        new_path = os.path.join(parent_item_path, Utils.unicode(changed_item_name))
+        new_path = os.path.join(Utils.unicode(parent_item_path), Utils.unicode(changed_item_name))
         if is_folder:
             change_type += '_folder'
             new_path = os.path.join(new_path, '')
@@ -416,7 +421,7 @@ class ExportService(object):
         parent_item_info = Utils.get_safe_value(items_info,parent_id)
         if parent_item_info:
             parent_item_path = parent_item_info['full_local_path']
-            new_path = os.path.join(parent_item_path, Utils.unicode(changed_item_name))
+            new_path = os.path.join(Utils.unicode(parent_item_path), Utils.unicode(changed_item_name))
             change_type = 'create'
             if is_folder:
                 change_type += '_folder'
