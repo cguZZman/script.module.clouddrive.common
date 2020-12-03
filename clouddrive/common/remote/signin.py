@@ -24,7 +24,6 @@ from clouddrive.common.remote.request import Request
 from clouddrive.common.ui.utils import KodiUtils
 from clouddrive.common.utils import Utils
 from clouddrive.common.exception import ExceptionUtils
-import urllib2
 
 
 class Signin(object):
@@ -35,11 +34,11 @@ class Signin(object):
     def create_pin(self, provider_name, request_params=None):
         request_params = Utils.default(request_params, {})
         headers = {'addon' : self.get_addon_header()}
-        body = urllib.urlencode({'provider': provider_name})
+        body = urllib.parse.urlencode({'provider': provider_name})
         return Request(KodiUtils.get_signin_server() + '/pin', body, headers, **request_params).request_json()
     
     def _on_exception(self, request, e, original_on_exception):
-        ex = ExceptionUtils.extract_exception(e, urllib2.HTTPError)
+        ex = ExceptionUtils.extract_exception(e, urllib.error.HTTPError)
         if ex and ex.code >= 400 and ex.code <= 599 and ex.code != 503:
             request.tries = request.current_tries
         if original_on_exception and not(original_on_exception is self._on_exception):
@@ -53,11 +52,11 @@ class Signin(object):
     
     def fetch_tokens_info(self, pin_info, request_params=None):
         request_params = self._wrap_on_exception(request_params)
-        headers = {'authorization': 'Basic ' + base64.b64encode(':' + pin_info['password']), 'addon' : self.get_addon_header()}
+        headers = {'authorization': 'Basic ' + Utils.str(base64.b64encode(Utils.encode(':' + pin_info['password']))), 'addon' : self.get_addon_header()}
         return Request(KodiUtils.get_signin_server() + '/pin/' + pin_info['pin'], None, headers, **request_params).request_json()
 
     def refresh_tokens(self, provider_name, refresh_token, request_params=None):
         request_params = Utils.default(request_params, {})
         headers = {'addon' : self.get_addon_header()}
-        body = urllib.urlencode({'provider': provider_name, 'refresh_token': refresh_token})
+        body = urllib.parse.urlencode({'provider': provider_name, 'refresh_token': refresh_token})
         return Request(KodiUtils.get_signin_server() + '/refresh', body, headers, **request_params).request_json()

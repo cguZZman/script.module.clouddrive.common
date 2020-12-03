@@ -23,8 +23,7 @@ import sys
 import threading
 import time
 import urllib
-from urllib2 import HTTPError, URLError
-import urlparse
+from urllib.error import HTTPError, URLError
 
 from clouddrive.common.account import AccountManager, AccountNotFoundException, \
     DriveNotFoundException
@@ -33,7 +32,6 @@ from clouddrive.common.export import ExportManager
 from clouddrive.common.remote.errorreport import ErrorReport
 from clouddrive.common.remote.request import Request
 from clouddrive.common.service.download import DownloadServiceUtil
-from clouddrive.common.service.rpc import RemoteProcessCallable
 from clouddrive.common.ui.dialog import DialogProgress, DialogProgressBG, \
     QRDialogProgress, ExportMainDialog
 from clouddrive.common.ui.logger import Logger
@@ -46,7 +44,7 @@ from datetime import timedelta, datetime
 from clouddrive.common.cache.cache import Cache
 
 
-class CloudDriveAddon(RemoteProcessCallable):
+class CloudDriveAddon:
     _DEFAULT_SIGNIN_TIMEOUT = 120
     _addon = None
     _addon_handle = None
@@ -95,7 +93,7 @@ class CloudDriveAddon(RemoteProcessCallable):
         
         if len(sys.argv) > 1:
             self._addon_handle = int(sys.argv[1])
-            self._addon_params = urlparse.parse_qs(sys.argv[2][1:])
+            self._addon_params = urllib.parse.parse_qs(sys.argv[2][1:])
             for param in self._addon_params:
                 self._addon_params[param] = self._addon_params.get(param)[0]
             self._content_type = Utils.get_safe_value(self._addon_params, 'content_type')
@@ -154,22 +152,22 @@ class CloudDriveAddon(RemoteProcessCallable):
             for drive in account['drives']:
                 context_options = []
                 params = {'action':'_search', 'content_type': self._content_type, 'driveid': drive['id']}
-                cmd = 'ActivateWindow(%d,%s?%s)' % (xbmcgui.getCurrentWindowId(), self._addon_url, urllib.urlencode(params))
+                cmd = 'ActivateWindow(%d,%s?%s)' % (xbmcgui.getCurrentWindowId(), self._addon_url, urllib.parse.urlencode(params))
                 context_options.append((self._common_addon.getLocalizedString(32039), cmd))
                 params['action'] = '_remove_account'
-                context_options.append((self._common_addon.getLocalizedString(32006), 'RunPlugin('+self._addon_url + '?' + urllib.urlencode(params)+')'))
+                context_options.append((self._common_addon.getLocalizedString(32006), 'RunPlugin('+self._addon_url + '?' + urllib.parse.urlencode(params)+')'))
                 if size > 1:
                     params['action'] = '_remove_drive'
-                    cmd =  'RunPlugin('+self._addon_url + '?' + urllib.urlencode(params)+')'
+                    cmd =  'RunPlugin('+self._addon_url + '?' + urllib.parse.urlencode(params)+')'
                     context_options.append((self._common_addon.getLocalizedString(32007), cmd))
                 list_item = xbmcgui.ListItem(drive['display_name'])
                 list_item.addContextMenuItems(context_options)
                 params = {'action':'_list_drive', 'content_type': self._content_type, 'driveid': drive['id']}
-                url = self._addon_url + '?' + urllib.urlencode(params)
+                url = self._addon_url + '?' + urllib.parse.urlencode(params)
                 listing.append((url, list_item, True))
         list_item = xbmcgui.ListItem(self._common_addon.getLocalizedString(32005))
         params = {'action':'_add_account', 'content_type': self._content_type}
-        url = self._addon_url + '?' + urllib.urlencode(params)
+        url = self._addon_url + '?' + urllib.parse.urlencode(params)
         listing.append((url, list_item))
         xbmcplugin.addDirectoryItems(self._addon_handle, listing, len(listing))
         xbmcplugin.endOfDirectory(self._addon_handle, True)
@@ -208,7 +206,7 @@ class CloudDriveAddon(RemoteProcessCallable):
         while not self.cancel_operation() and max_waiting_time > time.time():
             remaining = round(max_waiting_time-time.time())
             percent = int(remaining/self._DEFAULT_SIGNIN_TIMEOUT*100)
-            self._pin_dialog.update(percent, line3='[CR]'+self._common_addon.getLocalizedString(32011) % str(int(remaining)) + '[CR][CR]Your source id is: %s' % Utils.get_source_id(self._ip_before_pin))
+            self._pin_dialog.update(percent, line3='[CR]'+self._common_addon.getLocalizedString(32011) % str(int(remaining)) + '[CR][CR]Your source id is: %s' % Utils.get_source_id(Utils.unicode(self._ip_before_pin)))
             if int(remaining) % 5 == 0 or remaining == 1:
                 tokens_info = provider.fetch_tokens_info(pin_info, request_params = request_params)
                 if self.cancel_operation() or tokens_info:
@@ -271,13 +269,13 @@ class CloudDriveAddon(RemoteProcessCallable):
     def _remove_drive(self, driveid):
         account = self._account_manager.get_by_driveid('account', driveid)
         drive = self._account_manager.get_by_driveid('drive', driveid, account)
-        if self._dialog.yesno(self._addon_name, self._common_addon.getLocalizedString(32023) % self._get_display_name(account, drive, True), None):
+        if self._dialog.yesno(self._addon_name, self._common_addon.getLocalizedString(32023) % self._get_display_name(account, drive, True)):
             self._account_manager.remove_drive(driveid, account)
             KodiUtils.executebuiltin('Container.Refresh')
     
     def _remove_account(self, driveid):
         account = self._account_manager.get_by_driveid('account', driveid)
-        if self._dialog.yesno(self._addon_name, self._common_addon.getLocalizedString(32022) % self._get_display_name(account, with_format=True), None):
+        if self._dialog.yesno(self._addon_name, self._common_addon.getLocalizedString(32022) % self._get_display_name(account, with_format=True)):
             self._account_manager.remove_account(account['id'])
             KodiUtils.executebuiltin('Container.Refresh')
         
@@ -287,21 +285,21 @@ class CloudDriveAddon(RemoteProcessCallable):
             return
         if drive_folders:
             listing = []
-            url = self._addon_url + '?' + urllib.urlencode({'action':'_list_folder', 'path': '/', 'content_type': self._content_type, 'driveid': driveid})
+            url = self._addon_url + '?' + urllib.parse.urlencode({'action':'_list_folder', 'path': '/', 'content_type': self._content_type, 'driveid': driveid})
             listing.append((url, xbmcgui.ListItem('[B]%s[/B]' % self.get_my_files_menu_name()), True))
             for folder in drive_folders:
                 params = {'action':'_list_folder', 'path': folder['path'], 'content_type': self._content_type, 'driveid': driveid}
                 if 'params' in folder:
                     params.update(folder['params'])
-                url = self._addon_url + '?' + urllib.urlencode(params)
+                url = self._addon_url + '?' + urllib.parse.urlencode(params)
                 list_item = xbmcgui.ListItem(Utils.unicode(folder['name']))
                 if 'context_options' in folder:
                     list_item.addContextMenuItems(folder['context_options'])
                 listing.append((url, list_item, True))
             if self._content_type == 'video' or self._content_type == 'audio':
-                url = self._addon_url + '?' + urllib.urlencode({'action':'_list_exports', 'content_type': self._content_type, 'driveid': driveid})
+                url = self._addon_url + '?' + urllib.parse.urlencode({'action':'_list_exports', 'content_type': self._content_type, 'driveid': driveid})
                 listing.append((url, xbmcgui.ListItem(self._common_addon.getLocalizedString(32000)), True))
-            url = self._addon_url + '?' + urllib.urlencode({'action':'_search', 'content_type': self._content_type, 'driveid': driveid})
+            url = self._addon_url + '?' + urllib.parse.urlencode({'action':'_search', 'content_type': self._content_type, 'driveid': driveid})
             listing.append((url, xbmcgui.ListItem(self._common_addon.getLocalizedString(32039)), True))
             
             xbmcplugin.addDirectoryItems(self._addon_handle, listing, len(listing))
@@ -317,14 +315,14 @@ class CloudDriveAddon(RemoteProcessCallable):
             export = exports[exportid]
             if export['driveid'] == driveid and export['content_type'] == self._content_type:
                 item_name = Utils.unicode(export['name'])
-                params = {'action':'_open_export', 'content_type': self._content_type, 'driveid': driveid, 'item_driveid': export['item_driveid'], 'item_id': export['id'], 'name': urllib.quote(Utils.str(item_name))}
-                url = self._addon_url + '?' + urllib.urlencode(params)
+                params = {'action':'_open_export', 'content_type': self._content_type, 'driveid': driveid, 'item_driveid': export['item_driveid'], 'item_id': export['id'], 'name': urllib.parse.quote(Utils.str(item_name))}
+                url = self._addon_url + '?' + urllib.parse.urlencode(params)
                 list_item = xbmcgui.ListItem(item_name)
                 context_options = []
                 params['action'] = '_run_export'
-                context_options.append((KodiUtils.localize(21479), 'RunPlugin('+self._addon_url + '?' + urllib.urlencode(params)+')'))
+                context_options.append((KodiUtils.localize(21479), 'RunPlugin('+self._addon_url + '?' + urllib.parse.urlencode(params)+')'))
                 params['action'] = '_remove_export'
-                context_options.append((KodiUtils.localize(1210), 'RunPlugin('+self._addon_url + '?' + urllib.urlencode(params)+')'))
+                context_options.append((KodiUtils.localize(1210), 'RunPlugin('+self._addon_url + '?' + urllib.parse.urlencode(params)+')'))
                 list_item.addContextMenuItems(context_options)
                 listing.append((url, list_item, True))
         xbmcplugin.addDirectoryItems(self._addon_handle, listing, len(listing))
@@ -398,25 +396,25 @@ class CloudDriveAddon(RemoteProcessCallable):
             info = {'size': item['size'], 'date': KodiUtils.to_kodi_item_date_str(KodiUtils.to_datetime(Utils.get_safe_value(item, 'last_modified_date')))}
             if is_folder:
                 params['action'] = '_list_folder'
-                url = self._addon_url + '?' + urllib.urlencode(params)
+                url = self._addon_url + '?' + urllib.parse.urlencode(params)
                 params['action'] = '_search'
-                cmd = 'ActivateWindow(%d,%s?%s)' % (xbmcgui.getCurrentWindowId(), self._addon_url, urllib.urlencode(params))
+                cmd = 'ActivateWindow(%d,%s?%s)' % (xbmcgui.getCurrentWindowId(), self._addon_url, urllib.parse.urlencode(params))
                 context_options.append((self._common_addon.getLocalizedString(32039), cmd))
                 if self._content_type == 'audio' or self._content_type == 'video':
                     params['action'] = '_open_export'
-                    params['name'] = urllib.quote(Utils.str(item_name))
-                    context_options.append((self._common_addon.getLocalizedString(32004), 'RunPlugin('+self._addon_url + '?' + urllib.urlencode(params)+')'))
+                    params['name'] = urllib.parse.quote(Utils.str(item_name))
+                    context_options.append((self._common_addon.getLocalizedString(32004), 'RunPlugin('+self._addon_url + '?' + urllib.parse.urlencode(params)+')'))
                     del params['name']
                 elif self._content_type == 'image' and self._auto_refreshed_slideshow_supported:
                     params['action'] = '_slideshow'
-                    context_options.append((self._common_addon.getLocalizedString(32032), 'RunPlugin('+self._addon_url + '?' + urllib.urlencode(params)+')'))
+                    context_options.append((self._common_addon.getLocalizedString(32032), 'RunPlugin('+self._addon_url + '?' + urllib.parse.urlencode(params)+')'))
             elif (('video' in item or (item_name_extension and item_name_extension in self._video_file_extensions)) and self._content_type == 'video') or (('audio' in item or (item_name_extension and item_name_extension in self._audio_file_extensions)) and self._content_type == 'audio'):
                 list_item.setProperty('IsPlayable', 'true')
                 params['action'] = 'download'
-                cmd = 'RunPlugin('+self._addon_url + '?' + urllib.urlencode(params)+')'
+                cmd = 'RunPlugin('+self._addon_url + '?' + urllib.parse.urlencode(params)+')'
                 context_options.append((self._common_addon.getLocalizedString(32051), cmd))
                 params['action'] = 'play'
-                url = self._addon_url + '?' + urllib.urlencode(params)
+                url = self._addon_url + '?' + urllib.parse.urlencode(params)
                 info_type = self._content_type
                 if 'audio' in item:
                     info.update(item['audio'])
@@ -430,12 +428,12 @@ class CloudDriveAddon(RemoteProcessCallable):
                 Logger.debug('image in item: %s' % (Utils.str('image' in item)),)
                 Logger.debug('item_name_extension in self._image_file_extensions: %s' % (Utils.str(item_name_extension in self._image_file_extensions),))
                 params['action'] = 'download'
-                cmd = 'RunPlugin('+self._addon_url + '?' + urllib.urlencode(params)+')'
+                cmd = 'RunPlugin('+self._addon_url + '?' + urllib.parse.urlencode(params)+')'
                 context_options.append((self._common_addon.getLocalizedString(32051), cmd))
                 if 'url' in item:
                     url = item['url']
                 else:
-                    url = self._get_item_play_url(urllib.quote(Utils.str(item_name)), driveid, item_driveid, item_id)
+                    url = self._get_item_play_url(urllib.parse.quote(Utils.str(item_name)), driveid, item_driveid, item_id)
                 if 'image' in item:
                     info.update(item['image'])
                 list_item.setInfo('pictures', info)
@@ -498,7 +496,7 @@ class CloudDriveAddon(RemoteProcessCallable):
             params = {'action':'_list_folder', 'content_type': self._content_type,
                       'item_driveid': Utils.default(item_driveid, ''), 'item_id': Utils.default(item_id, ''), 'driveid': driveid, 'path' : Utils.default(path, '')}
             extra_params = ',recursive' if self._addon.getSetting('slideshow_recursive') == 'true' else ''
-            KodiUtils.executebuiltin('SlideShow('+self._addon_url + '?' + urllib.urlencode(params) + extra_params + ')')
+            KodiUtils.executebuiltin('SlideShow('+self._addon_url + '?' + urllib.parse.urlencode(params) + extra_params + ')')
             wait_for_slideshow = True
         else:
             Logger.notice('Slideshow child count is the same, nothing to refresh...')
@@ -538,7 +536,7 @@ class CloudDriveAddon(RemoteProcessCallable):
             Logger.debug('Abort requested...')
             
     def _get_item_play_url(self, file_name, driveid, item_driveid=None, item_id=None, is_subtitle=False):
-        return DownloadServiceUtil.build_download_url(driveid, item_driveid, item_id, urllib.quote(Utils.str(file_name)))
+        return DownloadServiceUtil.build_download_url(driveid, item_driveid, item_id, urllib.parse.quote(Utils.str(file_name)))
     
     def play(self, driveid, item_driveid=None, item_id=None):
         self.get_provider().configure(self._account_manager, driveid)
@@ -591,7 +589,7 @@ class CloudDriveAddon(RemoteProcessCallable):
         if find_subtitles and 'subtitles' in item:
             subtitles = []
             for subtitle in item['subtitles']:
-                subtitles.append(self._get_item_play_url(urllib.quote(Utils.str(subtitle['name'])), driveid, Utils.default(Utils.get_safe_value(subtitle, 'drive_id'), driveid), subtitle['id'], True))
+                subtitles.append(self._get_item_play_url(urllib.parse.quote(Utils.str(subtitle['name'])), driveid, Utils.default(Utils.get_safe_value(subtitle, 'drive_id'), driveid), subtitle['id'], True))
             list_item.setSubtitles(subtitles)
         if not self.cancel_operation():
             xbmcplugin.setResolvedUrl(self._addon_handle, succeeded, list_item)
@@ -613,7 +611,7 @@ class CloudDriveAddon(RemoteProcessCallable):
             line1 += ' ' + Utils.unicode(rex)
             line2 = ExceptionUtils.extract_error_message(rex.response)
         send_report = True
-        add_account_cmd = 'RunPlugin('+self._addon_url + '?' + urllib.urlencode({'action':'_add_account', 'content_type': self._content_type})+')'
+        add_account_cmd = 'RunPlugin('+self._addon_url + '?' + urllib.parse.urlencode({'action':'_add_account', 'content_type': self._content_type})+')'
         if isinstance(ex, AccountNotFoundException) or isinstance(ex, DriveNotFoundException):
             show_error_dialog = False
             if self._dialog.yesno(self._addon_name, self._common_addon.getLocalizedString(32063) % '\n'):
@@ -631,7 +629,7 @@ class CloudDriveAddon(RemoteProcessCallable):
                     if KodiUtils.get_signin_server() in rex.request or httpex.code == 401:
                         send_report = False
                         show_error_dialog = False
-                        if self._dialog.yesno(self._addon_name, self._common_addon.getLocalizedString(32046) % (self._get_display_name(account, drive, True), '\n')):
+                        if self._dialog.yesno(self._addon_name, self._common_addon.getLocalizedString(32046) % (self._get_display_name(account, drive, True) + '\n')):
                             KodiUtils.executebuiltin(add_account_cmd)
                     elif httpex.code == 403:
                         line1 = self._common_addon.getLocalizedString(32019)
@@ -668,12 +666,16 @@ class CloudDriveAddon(RemoteProcessCallable):
         report += '\n\nshow_error_dialog: %s' % show_error_dialog
         Logger.error(report)
         if show_error_dialog:
-            self._dialog.ok(self._addon_name, line1, line2, line3)
+            if line2:
+                line1 += '\n' + line2
+            if line3:
+                line1 += '\n' + line3
+            self._dialog.ok(self._addon_name, line1)
         if send_report:
             report_error = KodiUtils.get_addon_setting('report_error', self._common_addon_id) == 'true'
             report_error_invite = KodiUtils.get_addon_setting('report_error_invite', self._common_addon_id) == 'true'
             if not report_error and not report_error_invite:
-                if not self._dialog.yesno(self._addon_name, self._common_addon.getLocalizedString(32050), None, None, self._common_addon.getLocalizedString(32012), self._common_addon.getLocalizedString(32013)):
+                if not self._dialog.yesno(self._addon_name, self._common_addon.getLocalizedString(32050), self._common_addon.getLocalizedString(32012), self._common_addon.getLocalizedString(32013)):
                     KodiUtils.set_addon_setting('report_error', 'true', self._common_addon_id)
                 KodiUtils.set_addon_setting('report_error_invite', 'true', self._common_addon_id)
             ErrorReport.send_report(report)

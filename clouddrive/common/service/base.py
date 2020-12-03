@@ -18,9 +18,8 @@
 #-------------------------------------------------------------------------------
 
 
-from BaseHTTPServer import BaseHTTPRequestHandler
-from SocketServer import ThreadingTCPServer
-import SocketServer
+from http.server import BaseHTTPRequestHandler
+from socketserver import ThreadingTCPServer
 import shutil
 import socket
 import threading
@@ -37,7 +36,6 @@ class BaseServerService(object):
     data = None
     
     def __init__(self, data=None):
-        SocketServer.TCPServer.allow_reuse_address = True
         self.data = data
     
     def get_port(self):
@@ -51,6 +49,7 @@ class BaseServerService(object):
         port = self.get_port()
         KodiUtils.set_service_port(self.name, port)
         self._server = BaseServer((self._interface, port), self._handler, self, self.data)
+        self._server.allow_reuse_address = True
         Logger.notice('Service \'%s\' started in port %s' % (self.name, port))
         self._server.serve_forever()
     
@@ -98,7 +97,7 @@ class BaseHandler(BaseHTTPRequestHandler):
             self.send_header('Content-Type', self.content_type)
             self.send_header('Content-Length', length)
         self.send_header('Connection', 'close')
-        request_id = self.headers.getheader('request-id')
+        request_id = self.headers.get('request-id')
         if request_id:
             self.send_header('request-id', request_id)
         for key in headers:

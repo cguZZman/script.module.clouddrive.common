@@ -74,18 +74,18 @@ class Utils:
     
     @staticmethod
     def unicode(txt):
-        if isinstance (txt,str):
+        if isinstance (txt, (bytes, bytearray)):
             txt = txt.decode("utf-8")
-        return u'%s' % (txt)
+        return u'%s' % txt
     
     @staticmethod
     def str(txt):
-        return Utils.unicode(txt).encode("utf-8", 'replace')
+        return Utils.unicode(txt)
     
     @staticmethod
-    def ascii(txt):
-        return Utils.unicode(txt).encode('ascii', 'ignore')
-   
+    def encode(txt):
+        return Utils.unicode(txt).encode("utf-8")
+    
     @staticmethod
     def get_fqn(o):
         return o.__module__ + "." + o.__class__.__name__
@@ -100,12 +100,13 @@ class Utils:
     
     @staticmethod
     def get_file_buffer():
-        try:
-            from cStringIO import StringIO
-        except ImportError:
-            from StringIO import StringIO
-            
+        from io import StringIO
         return StringIO()
+    
+    @staticmethod
+    def get_file_byte_buffer():
+        from io import BytesIO
+        return BytesIO()
     
     @staticmethod
     def get_parent_path(path):

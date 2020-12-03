@@ -22,7 +22,6 @@ from threading import Lock
 import threading
 import time
 import urllib
-import urlparse
 
 class KodiUtils:
     HOME_WINDOW = 10000
@@ -119,7 +118,7 @@ class KodiUtils:
     def run_script(script, params=None, wait=False):
         import xbmc
         if params:
-            params = urllib.urlencode(params)
+            params = urllib.parse.urlencode(params)
         cmd = 'RunScript(%s,0,?%s)' % (script, params)
         xbmc.executebuiltin(cmd, wait)
         
@@ -128,7 +127,7 @@ class KodiUtils:
         import xbmc
         url = 'plugin://%s/' % addonid
         if params:
-            url += '?%s' % urllib.urlencode(params)
+            url += '?%s' % urllib.parse.urlencode(params)
         cmd = 'RunPlugin(%s)' % url
         xbmc.executebuiltin(cmd, wait)
         
@@ -138,7 +137,7 @@ class KodiUtils:
         if not window_id:
             window_id = KodiUtils.get_current_window_id()
         if params:
-            addon_url += '?%s' % urllib.urlencode(params)
+            addon_url += '?%s' % urllib.parse.urlencode(params)
         cmd = 'ActivateWindow(%d,%s)' % (window_id, addon_url)
         xbmc.executebuiltin(cmd, wait)
         
@@ -148,7 +147,7 @@ class KodiUtils:
         if not window_id:
             window_id = KodiUtils.get_current_window_id()
         if params:
-            addon_url += '?%s' % urllib.urlencode(params)
+            addon_url += '?%s' % urllib.parse.urlencode(params)
         cmd = 'ReplaceWindow(%d,%s)' % (window_id, addon_url)
         xbmc.executebuiltin(cmd, wait)
     
@@ -214,17 +213,17 @@ class KodiUtils:
         if level == 0:
             level = xbmc.LOGDEBUG
         elif level == 1:
-            level = xbmc.LOGNOTICE
+            level = xbmc.LOGINFO
         elif level == 2:
             level = xbmc.LOGWARNING
         elif level == 3:
             level = xbmc.LOGERROR
-        xbmc.log('[%s][%s-%s]: %s' % (KodiUtils.get_addon_info('id'), threading.current_thread().name,threading.current_thread().ident, Utils.str(msg)), level)
+        xbmc.log(u'[%s][%s-%s]: %s' % (KodiUtils.get_addon_info('id'), threading.current_thread().name,threading.current_thread().ident, Utils.str(msg)), level)
 
     @staticmethod
     def translate_path(path):
-        import xbmc
-        return xbmc.translatePath(path)
+        import xbmcvfs
+        return xbmcvfs.translatePath(path)
     
     @staticmethod
     def to_kodi_item_date_str(dt):
@@ -332,7 +331,7 @@ class KodiUtils:
                 path = video['file']
                 content = KodiUtils.read_content_file(path)
                 if content:
-                    params = urlparse.parse_qs(urlparse.urlparse(content).query)
+                    params = urllib.parse.parse_qs(urllib.parse.urlparse(content).query)
                     if 'item_id' in params:
                         if params['item_id'][0] == item_id:
                             KodiUtils.log('FOUND!', KodiUtils.LOGDEBUG)

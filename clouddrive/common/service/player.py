@@ -38,7 +38,7 @@ class PlayerService(object):
         if KodiUtils.get_info_label('System.BuildVersion').startswith('17.'):
             KodiUtils.set_home_property('iskrypton', 'true')
         self.addon_name = KodiUtils.get_addon_info('name')
-        self.url_pattern = 'http.*:%s/%s/%s/.*' % (KodiUtils.get_addon_setting('port_directory_listing'), SourceService.name, urllib.quote(self.addon_name))
+        self.url_pattern = 'http.*:%s/%s/%s/.*' % (KodiUtils.get_addon_setting('port_directory_listing'), SourceService.name, urllib.parse.quote(self.addon_name))
         Logger.debug(self.url_pattern)
         self.player = KodiPlayer()
         self.player.set_source_url_matcher(re.compile(self.url_pattern))
@@ -156,7 +156,7 @@ class KodiPlayer(KodiUtils.kodi_player_class()):
                 driveid = response['driveid']
                 subtitles = response['subtitles']
                 for subtitle in subtitles:
-                    url = DownloadServiceUtil.build_download_url(driveid, Utils.default(Utils.get_safe_value(subtitle, 'drive_id'), driveid), subtitle['id'], urllib.quote(Utils.str(subtitle['name'])))
+                    url = DownloadServiceUtil.build_download_url(driveid, Utils.default(Utils.get_safe_value(subtitle, 'drive_id'), driveid), subtitle['id'], urllib.parse.quote(Utils.str(subtitle['name'])))
                     Logger.debug('subtitle: %s' % url)
                     self.setSubtitles(url)
         except Exception as e:

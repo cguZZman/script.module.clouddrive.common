@@ -22,7 +22,6 @@ import time
 from clouddrive.common.remote.oauth2 import OAuth2
 from clouddrive.common.remote.signin import Signin
 from clouddrive.common.utils import Utils
-from __builtin__ import False
 
 
 class Provider(OAuth2):

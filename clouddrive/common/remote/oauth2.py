@@ -21,12 +21,11 @@ import json
 import re
 import time
 import urllib
-import urllib2
 
 from clouddrive.common.exception import ExceptionUtils, RequestException
 from clouddrive.common.remote.request import Request
-from clouddrive.common.ui.logger import Logger
 from clouddrive.common.utils import Utils
+from urllib.error import HTTPError
 
 
 class OAuth2(object):
@@ -47,7 +46,7 @@ class OAuth2(object):
         raise NotImplementedError()
     
     def _on_exception(self, request, e, original_on_exception):
-        ex = ExceptionUtils.extract_exception(e, urllib2.HTTPError)
+        ex = ExceptionUtils.extract_exception(e, HTTPError)
         if ex and ex.code != 503:
             request.tries = request.current_tries
         if original_on_exception and not(original_on_exception is self._on_exception):
@@ -78,7 +77,7 @@ class OAuth2(object):
     def prepare_request(self, method, path, parameters=None, request_params=None, access_tokens=None, headers=None):
         parameters = Utils.default(parameters, {})
         access_tokens = Utils.default(access_tokens, {})
-        encoded_parameters = urllib.urlencode(parameters)
+        encoded_parameters = urllib.parse.urlencode(parameters)
         url = self._build_url(method, path, encoded_parameters)
         request_params = self._wrap_on_exception(request_params)
         if not headers:

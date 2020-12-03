@@ -17,8 +17,6 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #-------------------------------------------------------------------------------
 
-from urllib2 import HTTPError
-
 from clouddrive.common.account import AccountManager
 from clouddrive.common.exception import ExceptionUtils
 from clouddrive.common.remote.errorreport import ErrorReport
@@ -26,6 +24,7 @@ from clouddrive.common.service.base import BaseServerService, BaseHandler
 from clouddrive.common.ui.logger import Logger
 from clouddrive.common.ui.utils import KodiUtils
 from clouddrive.common.utils import Utils
+from urllib.error import HTTPError
 
 
 class DownloadService(BaseServerService):

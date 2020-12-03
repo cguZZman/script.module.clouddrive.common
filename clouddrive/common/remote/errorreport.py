@@ -19,7 +19,6 @@
 
 import threading
 import urllib
-from urllib2 import HTTPError
 
 from clouddrive.common.exception import ExceptionUtils, RequestException
 from clouddrive.common.remote.request import Request
@@ -27,6 +26,7 @@ from clouddrive.common.ui.logger import Logger
 from clouddrive.common.ui.utils import KodiUtils
 from clouddrive.common.utils import Utils
 from clouddrive.common.account import DriveNotFoundException
+from urllib.error import HTTPError
 
 
 class ErrorReport(object):
@@ -35,7 +35,7 @@ class ErrorReport(object):
     def send_report(report):
         if KodiUtils.get_addon_setting('report_error') == 'true':
             report_url = KodiUtils.get_signin_server() + '/report'
-            t = threading.Thread(target=Request(report_url, urllib.urlencode({'stacktrace' : report})).request)
+            t = threading.Thread(target=Request(report_url, urllib.parse.urlencode({'stacktrace' : report})).request)
             t.setDaemon(True)
             t.start()
     

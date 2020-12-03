@@ -17,7 +17,6 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-from __builtin__ import True
 import sqlite3
 
 from clouddrive.common.ui.logger import Logger

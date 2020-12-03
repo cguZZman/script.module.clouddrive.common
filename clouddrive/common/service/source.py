@@ -20,10 +20,8 @@
 import datetime
 import json
 import time
-from types import NoneType
 import urllib
-from urllib2 import HTTPError
-from urlparse import urlparse
+from urllib.error import HTTPError
 
 from clouddrive.common.account import AccountManager
 from clouddrive.common.exception import ExceptionUtils, RequestException
@@ -34,6 +32,7 @@ from clouddrive.common.ui.logger import Logger
 from clouddrive.common.ui.utils import KodiUtils
 from clouddrive.common.utils import Utils
 from clouddrive.common.cache.cache import Cache
+from urllib.parse import urlparse
 
 
 class Source(BaseHandler):
@@ -63,7 +62,7 @@ class Source(BaseHandler):
         return self.server.data(source_mode = True)
     
     def open_table(self, title):
-        title = urllib.unquote(title)
+        title = urllib.parse.unquote(title)
         html = XHTML('html')
         html.head.title(title)
         body = html.body
@@ -80,7 +79,7 @@ class Source(BaseHandler):
     
     def add_row(self, table, file_name, date='  - ', size='  - ', description='&nbsp;'):
         row = table.tr
-        row.td.a(file_name, href=urllib.quote(file_name))
+        row.td.a(file_name, href=urllib.parse.quote(file_name))
         row.td(date, align='right')
         row.td(size, align='right')
         row.td(description, escape=False)
@@ -117,7 +116,7 @@ class Source(BaseHandler):
         addons = self.get_cloud_drive_addons()
         addonid = None
         for addon in addons:
-            if urllib.quote(Utils.str(addon['name'])) == addon_name:
+            if urllib.parse.quote(Utils.str(addon['name'])) == addon_name:
                 addonid = addon['addonid']
                 break
         return addonid
@@ -132,8 +131,8 @@ class Source(BaseHandler):
             self.add_row(table, KodiUtils.get_addon_info('name') + '/')
             
         self.close_table(table)
-        response = Utils.get_file_buffer()
-        response.write(str(html))
+        response = Utils.get_file_byte_buffer()
+        response.write(Utils.encode(html))
         return {'response_code': 200, 'content': response}
         
     def get_drive_list(self):
@@ -151,7 +150,7 @@ class Source(BaseHandler):
         driveid = None
         drives = self.get_drive_list()
         for drive in drives:
-            if urllib.quote(Utils.str(drive['display_name'])) == drive_name:
+            if urllib.parse.quote(Utils.str(drive['display_name'])) == drive_name:
                 driveid = drive['id']
                 break
         return driveid
@@ -163,13 +162,13 @@ class Source(BaseHandler):
         for drive in drives:
             self.add_row(table, Utils.str(drive['display_name']) + '/')
         self.close_table(table)
-        response = Utils.get_file_buffer()
-        response.write(str(html))
+        response = Utils.get_file_byte_buffer()
+        response.write(Utils.encode(html))
         return {'response_code': 200, 'content': response}
     
     def process_path(self, addon_name, drive_name, path):
         headers = {}
-        response = Utils.get_file_buffer()
+        response = Utils.get_file_byte_buffer()
         driveid = self.get_driveid(drive_name)
         if driveid:
             parts = self.path.split('/')
@@ -182,12 +181,12 @@ class Source(BaseHandler):
                     Logger.debug('query: %s' % u.query)
                     if u.query == 'subtitles':
                         response_code = 200
-                        response.write(json.dumps({'driveid': driveid, 'subtitles': self.get_subtitles(driveid, path)}))
+                        response.write(Utils.encode(json.dumps({'driveid': driveid, 'subtitles': self.get_subtitles(driveid, path)})))
                     else:
                         key = '%s%s:children' % (driveid, path[0:path.rfind('/')],)
                         Logger.debug('reading cache key: ' + key)
                         children = self._children_cache.get(key)
-                        if not children and type(children) is NoneType:
+                        if not children and isinstance(children, type(None)):
                             self.get_folder_items(driveid, path[0:path.rfind('/')+1])
                         url = self.get_download_url(driveid, path)
                         headers['location'] = url
@@ -197,10 +196,10 @@ class Source(BaseHandler):
                     headers['location'] = url
             else:
                 response_code = 200
-                response.write(str(self.show_folder(driveid, path)))
+                response.write(Utils.encode(self.show_folder(driveid, path)))
         else:
             response_code = 404
-            response.write('Drive "%s" does not exist for addon "%s"' % (drive_name, addon_name))
+            response.write(Utils.encode('Drive "%s" does not exist for addon "%s"' % (drive_name, addon_name)))
         return {'response_code': response_code, 'content': response, 'headers': headers}
     
     def get_folder_items(self, driveid, path):
@@ -211,13 +210,13 @@ class Source(BaseHandler):
         self.is_path_possible(driveid, request_path)
         key = '%s%s:items' % (driveid, cache_path,)
         items = self._items_cache.get(key)
-        if not items and type(items) is NoneType:
+        if not items and isinstance(items, type(None)):
             items = provider.get_folder_items(path=request_path, include_download_info=True)
             self._items_cache.set(key, items)
             children_names = []
             cache_items = []
             for item in items:
-                quoted_name = urllib.quote(Utils.str(item['name']))
+                quoted_name = urllib.parse.quote(Utils.str(item['name']))
                 children_names.append(quoted_name)
                 key = '%s%s%s' % (driveid, path, quoted_name,)
                 Logger.debug('Adding item in cache for bulk: %s' % key)
@@ -335,8 +334,8 @@ class Source(BaseHandler):
                     self._page_cache.remove(self.path)
                 else:
                     if 'content' in cached_page and cached_page['content']:
-                        content = Utils.get_file_buffer()
-                        content.write(cached_page['content'])
+                        content = Utils.get_file_byte_buffer()
+                        content.write(Utils.encode(cached_page['content']))
                         cached_page['content'] = content
                     self.write_response(cached_page['response_code'], content=Utils.get_safe_value(cached_page, 'content'), headers=Utils.get_safe_value(cached_page, 'headers', {}))
                     Logger.debug(self.path + ': %d - Served from cache' % cached_page['response_code'])
@@ -360,8 +359,8 @@ class Source(BaseHandler):
                         cached_page['response_code'] = 500
                     
                     ErrorReport.handle_exception(e)
-                    content = Utils.get_file_buffer()
-                    content.write(ExceptionUtils.full_stacktrace(e))
+                    content = Utils.get_file_byte_buffer()
+                    content.write(Utils.encode(ExceptionUtils.full_stacktrace(e)))
                     
                     cached_page['content'] = content
             else:

@@ -49,7 +49,7 @@ class DialogProgressBG (xbmcgui.DialogProgressBG):
             self.create(heading=heading, message=message)
         if percent < 0: percent = 0
         if percent > 100: percent = 100
-        super(DialogProgressBG, self).update(percent=percent, heading=heading, message=message)
+        super(DialogProgressBG, self).update(percent=int(percent), heading=heading, message=message)
     
     def iscanceled(self):
         if self.created:
@@ -66,8 +66,11 @@ class DialogProgress (xbmcgui.DialogProgress):
     def create(self, heading, line1="", line2="", line3=""):
         if self.created:
             self.close()
-            
-        super(DialogProgress, self).create(heading, line1, line2, line3)
+        if line2:
+            line1 += line2
+        if line3:
+            line1 += line3
+        super(DialogProgress, self).create(heading, line1)
         self.created = True
     
     def close(self):
@@ -80,7 +83,11 @@ class DialogProgress (xbmcgui.DialogProgress):
             self.create(self._default_heading, line1, line2, line3)
         if percent < 0: percent = 0
         if percent > 100: percent = 100
-        super(DialogProgress, self).update(percent, line1, line2, line3)
+        if line2:
+            line1 += line2
+        if line3:
+            line1 += line3
+        super(DialogProgress, self).update(int(percent), line1)
         
     def iscanceled(self):
         if self.created:
@@ -233,11 +240,11 @@ class ExportScheduleDialog(xbmcgui.WindowXMLDialog):
 class ExportMainDialog(xbmcgui.WindowXMLDialog):
 
     def __init__(self, *args, **kwargs):
-        self.content_type = urllib.unquote(kwargs["content_type"])
+        self.content_type = urllib.parse.unquote(kwargs["content_type"])
         self.driveid = kwargs["driveid"]
         self.item_driveid = kwargs["item_driveid"]
         self.item_id = kwargs["item_id"]
-        self.name = urllib.unquote(kwargs["name"])
+        self.name = urllib.parse.unquote(kwargs["name"])
         self.account_manager = kwargs["account_manager"]
         self.provider = kwargs["provider"]
         self.provider.configure(self.account_manager, self.driveid)

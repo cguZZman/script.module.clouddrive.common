@@ -19,13 +19,14 @@
 
 import json
 import time
-import urllib2
 
 from clouddrive.common.exception import RequestException
 from clouddrive.common.ui.logger import Logger
 from clouddrive.common.utils import Utils
-from cookielib import CookieJar
+from http.cookiejar import CookieJar
 from clouddrive.common.ui.utils import KodiUtils
+from urllib.error import HTTPError
+import urllib
 
 
 class Request(object):
@@ -61,7 +62,10 @@ class Request(object):
                  before_request=None, on_exception=None, on_failure=None, on_success=None, on_complete=None, on_update_download=None, \
                  cancel_operation=None, waiting_retry=None, wait=None, read_content=True, download_path=None):
         self.url = url
-        self.data = data
+        if isinstance(data, str):
+            self.data = Utils.encode(data)
+        else:
+            self.data = data
         self.headers = headers
         self.tries = tries
         self.current_tries = tries
@@ -109,7 +113,7 @@ class Request(object):
         if not self.headers:
             self.headers = {}
         
-        for i in xrange(self.tries):
+        for i in range(self.tries):
             self.current_tries = i + 1
             if self.before_request:
                 self.before_request(self)
@@ -124,8 +128,8 @@ class Request(object):
             download_file = None
             try:
                 Logger.debug(request_report)
-                req = urllib2.Request(self.url, self.data, self.headers)
-                response = urllib2.urlopen(req)
+                req = urllib.request.Request(self.url, self.data, self.headers)
+                response = urllib.request.urlopen(req)
                 self.response_code = response.getcode()
                 self.response_info = response.info()
                 self.response_url = response.geturl()
@@ -148,7 +152,7 @@ class Request(object):
                         self.response_text += ' OK.'
                     else:
                         self.response_text = response.read()
-                content_length = self.response_info.getheader('content-length', -1)
+                content_length = self.response_info.get('content-length', -1)
                 response_report = '\nResponse Headers:\n%s' % Utils.str(self.response_info)
                 response_report += '\nResponse (%d) content-length=%s, len=<%s>:\n' % (self.response_code, content_length, len(self.response_text),)
                 try:
@@ -161,7 +165,7 @@ class Request(object):
                 Logger.debug('Exception...')
                 root_exception = e
                 response_report = '\nResponse <Exception>: ' 
-                if isinstance(e, urllib2.HTTPError):
+                if isinstance(e, HTTPError):
                     self.response_code = e.code
                     self.response_text = Utils.str(e.read())
                     response_report += self.response_text
