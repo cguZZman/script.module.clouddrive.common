@@ -67,9 +67,12 @@ class Download(BaseHandler):
 class DownloadServiceUtil(object):
     @staticmethod
     def build_download_url(driveid, item_driveid, item_id, name, addonid=None):
-        return 'http://%s:%s/%s/%s/%s/%s/%s' % (
-            DownloadService._interface,
-            KodiUtils.get_service_port(DownloadService.name, addonid),
-            DownloadService.name,
-            driveid, item_driveid, item_id, name
+        return "http://{host}:{port}/{service}/{driveid}/{item_driveid}/{item_id}/{name}".format(
+            host = DownloadService._interface,
+            port = KodiUtils.get_service_port(DownloadService.name, addonid),
+            service = DownloadService.name,
+            driveid = driveid,
+            item_driveid = item_driveid, 
+            item_id = item_id, 
+            name = name
         )

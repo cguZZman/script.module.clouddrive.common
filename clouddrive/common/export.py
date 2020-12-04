@@ -130,16 +130,12 @@ class ExportManager(object):
     
     @staticmethod
     def create_text_file(file_path, content):
-        f = None
         try:
-            f = KodiUtils.file(file_path, 'w')
-            f.write(Utils.str(content))
+            with KodiUtils.file(file_path, 'w') as f:
+                f.write(Utils.str(content))
         except Exception as e:
             ErrorReport.handle_exception(e)
             return False
-        finally:
-            if f:
-                f.close()
         return True
 
     @staticmethod

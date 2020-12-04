@@ -124,13 +124,6 @@ class BaseHandler(BaseHTTPRequestHandler):
         BaseHTTPRequestHandler.end_headers(self)
         self.response_headers_block_sent = True
      
-    def log_message(self, format, *args):
-        #Logger.notice("[%s.service] %s\n" % (self.server.service.name, format%args))
-        return
-        
-    def log_error(self, format, *args):
-        Logger.error("[%s.service] %s\n" % (self.server.service.name, format%args))
-        
     def do_HEAD(self):
         self.do_GET()
 
