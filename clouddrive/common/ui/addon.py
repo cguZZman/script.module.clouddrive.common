@@ -35,17 +35,13 @@ from clouddrive.common.ui.dialog import DialogProgress, DialogProgressBG, \
     QRDialogProgress, ExportMainDialog
 from clouddrive.common.ui.logger import Logger
 from clouddrive.common.ui.utils import KodiUtils
-from clouddrive.common.utils import Utils
+from clouddrive.common.utils import Utils, ARCHIVE_EXTENSIONS
 import xbmcgui
 import xbmcplugin
 import xbmcvfs
 from datetime import timedelta, datetime
 from clouddrive.common.cache.cache import Cache
 
-
-# Kodi lists archives as music/picture types because it can browse them like folders. From a cloud drive that
-# means downloading the whole archive (e.g. multi-GB backups) just to look inside, so they are not listed.
-ARCHIVE_EXTENSIONS = ('', 'zip', 'rar', '001', '7z', 'cbz', 'cbr')
 
 class CloudDriveAddon:
     _DEFAULT_SIGNIN_TIMEOUT = 120

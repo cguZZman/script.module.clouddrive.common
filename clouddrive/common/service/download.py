@@ -20,9 +20,10 @@
 import shutil
 import threading
 import time
+import urllib.parse
 import urllib.request
 
-from clouddrive.common.account import AccountManager
+from clouddrive.common.account import AccountManager, DriveNotFoundException
 from clouddrive.common.exception import ExceptionUtils
 from clouddrive.common.remote.errorreport import ErrorReport
 from clouddrive.common.service.base import BaseServerService, BaseHandler
@@ -30,6 +31,17 @@ from clouddrive.common.ui.logger import Logger
 from clouddrive.common.ui.utils import KodiUtils
 from clouddrive.common.utils import Utils
 from urllib.error import HTTPError
+
+
+class _SameHostAuthRedirectHandler(urllib.request.HTTPRedirectHandler):
+    # urllib copies every request header to a redirect target, including Authorization. Only keep it for the same host.
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        new_req = super(_SameHostAuthRedirectHandler, self).redirect_request(req, fp, code, msg, headers, newurl)
+        if new_req is not None and urllib.parse.urlsplit(newurl).netloc != urllib.parse.urlsplit(req.full_url).netloc:
+            new_req.remove_header('Authorization')
+        return new_req
+
+_opener = urllib.request.build_opener(_SameHostAuthRedirectHandler)
 
 
 class DownloadService(BaseServerService):
@@ -56,24 +68,28 @@ class Download(BaseHandler):
         data = self.path.split('/')
         code = 500
         headers = {}
-        content = Utils.get_file_buffer()
+        content = Utils.get_file_byte_buffer()
         if len(data) > 4 and data[1] == self.server.service.name:
             try:
                 driveid = data[2]
                 provider = self.server.data()
                 account_manager = AccountManager(self.server.service.profile_path)
                 provider.configure(account_manager, driveid)
+                # Raises if the account was removed, so cached download links stop working with it.
+                account_manager.get_by_driveid('drive', driveid)
                 self._stream(provider, self._get_download_url(provider, driveid, data[3], data[4]))
                 return
             except Exception as e:
                 httpex = ExceptionUtils.extract_exception(e, HTTPError)
                 if httpex:
                     code = httpex.code
+                elif ExceptionUtils.extract_exception(e, DriveNotFoundException):
+                    code = 404
                 else:
                     code = 500
                 
                 ErrorReport.handle_exception(e)
-                content.write(ExceptionUtils.full_stacktrace(e))
+                content.write(Utils.encode(ExceptionUtils.full_stacktrace(e)))
         else:
             code = 404
         self.write_response(code, content=content, headers=headers)
@@ -110,7 +126,7 @@ class Download(BaseHandler):
             if value:
                 headers[name] = value
         try:
-            response = urllib.request.urlopen(urllib.request.Request(url, None, headers))
+            response = _opener.open(urllib.request.Request(url, None, headers))
         except HTTPError as e:
             response = e
         try:

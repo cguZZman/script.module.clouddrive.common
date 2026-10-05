@@ -41,6 +41,9 @@ class AccountManager(object):
                         accounts = json.loads(fo.read())
                         for accountid in accounts:
                             self.db.set(accountid, accounts[accountid])
+                    # The db only logs write errors, so check every account before deleting the only other copy.
+                    if any(self.db.get(accountid) != accounts[accountid] for accountid in accounts):
+                        raise Exception('Not all accounts were saved')
                     os.remove(config_path)
                 except Exception as ex:
                     Logger.debug("Error migrating accounts.")

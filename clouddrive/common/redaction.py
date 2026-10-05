@@ -24,8 +24,8 @@ import re
 _SECRET_KEYS = r'access_token|refresh_token|id_token|client_secret|code_verifier|device_code|password|code|tempauth'
 _REMOVED = '*removed*'
 
-# key=value in query strings, form bodies and Kodi's "url|Header=value" options
-_FORM = re.compile(r'(?i)((?:^|[?&|\s"\'])(?:' + _SECRET_KEYS + r')=)[^&\s"\']+')
+# key=value in query strings, URL fragments, form bodies and Kodi's "url|Header=value" options
+_FORM = re.compile(r'(?i)((?:^|[?&|#;\s"\'])(?:' + _SECRET_KEYS + r')=)[^&\s"\']+')
 # "key": "value" in JSON, and 'key': 'value' in printed Python dicts
 _JSON = re.compile(r'(?i)(["\'](?:' + _SECRET_KEYS + r')["\']\s*:\s*["\'])[^"\']*')
 # Authorization header values, also URL-encoded (Bearer%20...)
