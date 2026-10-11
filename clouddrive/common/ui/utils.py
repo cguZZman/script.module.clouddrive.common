@@ -199,16 +199,16 @@ class KodiUtils:
         with KodiUtils.lock:
             KodiUtils.set_addon_setting('%s.service.port' % service, Utils.str(port), addonid)
     
-    # Default sign-in servers of earlier add-on versions. When an add-on update changes the default, Kodi keeps the
+    # Default sign-in server of earlier add-on versions. When an add-on update changes the default, Kodi keeps the
     # old default as if the user had chosen it, so get_signin_server moves it to the add-on's current default.
-    _OLD_SIGNIN_SERVERS = ('https://drive-login.herokuapp.com', 'https://signinserver.com')
+    _OLD_SIGNIN_SERVER = 'https://drive-login.herokuapp.com'
 
     @staticmethod
     def get_signin_server(addonid=None):
         server = KodiUtils.get_addon_setting('sign-in-server', addonid)
-        if server.strip().rstrip('/').lower() in KodiUtils._OLD_SIGNIN_SERVERS:
+        if server.strip().rstrip('/').lower() == KodiUtils._OLD_SIGNIN_SERVER:
             default = KodiUtils.get_signin_server_default(addonid)
-            if default and default.rstrip('/').lower() not in KodiUtils._OLD_SIGNIN_SERVERS:
+            if default and default.rstrip('/').lower() != KodiUtils._OLD_SIGNIN_SERVER:
                 KodiUtils.set_addon_setting('sign-in-server', default, addonid)
                 return default
         return server
