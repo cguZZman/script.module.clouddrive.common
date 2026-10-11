@@ -19,6 +19,8 @@
 
 
 from threading import Lock
+import os
+import re
 import threading
 import time
 import urllib
@@ -197,9 +199,29 @@ class KodiUtils:
         with KodiUtils.lock:
             KodiUtils.set_addon_setting('%s.service.port' % service, Utils.str(port), addonid)
     
+    # Default sign-in servers of earlier add-on versions. When an add-on update changes the default, Kodi keeps the
+    # old default as if the user had chosen it, so get_signin_server moves it to the add-on's current default.
+    _OLD_SIGNIN_SERVERS = ('https://drive-login.herokuapp.com', 'https://signinserver.com')
+
     @staticmethod
     def get_signin_server(addonid=None):
-        return KodiUtils.get_addon_setting('sign-in-server', addonid)
+        server = KodiUtils.get_addon_setting('sign-in-server', addonid)
+        if server.strip().rstrip('/').lower() in KodiUtils._OLD_SIGNIN_SERVERS:
+            default = KodiUtils.get_signin_server_default(addonid)
+            if default and default.rstrip('/').lower() not in KodiUtils._OLD_SIGNIN_SERVERS:
+                KodiUtils.set_addon_setting('sign-in-server', default, addonid)
+                return default
+        return server
+
+    @staticmethod
+    def get_signin_server_default(addonid=None):
+        try:
+            path = os.path.join(KodiUtils.get_addon_info('path', addonid), 'resources', 'settings.xml')
+            with open(path, encoding='utf-8') as settings:
+                match = re.search(r'id="sign-in-server"[^>]*\sdefault="([^"]+)"', settings.read())
+            return match.group(1) if match else None
+        except Exception:
+            return None
     
     @staticmethod
     def get_cache_expiration_time(addonid=None):

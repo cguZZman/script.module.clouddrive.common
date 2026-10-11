@@ -193,6 +193,8 @@ class CloudDriveAddon:
             return
         if not pin_info:
             raise Exception('Unable to retrieve a pin code')
+        source_ids = provider.register_networks(pin_info)
+        source_id = ', '.join(source_ids) if source_ids else str(Utils.get_source_id(Utils.unicode(self._ip_before_pin)))
 
         tokens_info = {}
         request_params['on_complete'] = lambda request: self._progress_dialog_bg.close()
@@ -205,7 +207,7 @@ class CloudDriveAddon:
         while not self.cancel_operation() and max_waiting_time > time.time():
             remaining = round(max_waiting_time-time.time())
             percent = int(remaining/self._DEFAULT_SIGNIN_TIMEOUT*100)
-            self._pin_dialog.update(percent, line3='[CR]'+self._common_addon.getLocalizedString(32011) % str(int(remaining)) + '[CR][CR]Your source id is: %s' % Utils.get_source_id(Utils.unicode(self._ip_before_pin)))
+            self._pin_dialog.update(percent, line3='[CR]'+self._common_addon.getLocalizedString(32011) % str(int(remaining)) + '[CR][CR]Your source id is: %s' % source_id)
             if int(remaining) % 5 == 0 or remaining == 1:
                 tokens_info = provider.fetch_tokens_info(pin_info, request_params = request_params)
                 if self.cancel_operation() or tokens_info:
