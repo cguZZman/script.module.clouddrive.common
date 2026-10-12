@@ -327,7 +327,8 @@ class CloudDriveAddon:
                 context_options.append((self._common_addon.getLocalizedString(32051), cmd))
                 params['action'] = 'play'
                 url = self._addon_url + '?' + urllib.parse.urlencode(params)
-                info_type = self._content_type
+                # Kodi's info type for audio is 'music'.
+                info_type = 'music' if self._content_type == 'audio' else self._content_type
                 if 'audio' in item:
                     info.update(item['audio'])
                     info_type = 'music'
