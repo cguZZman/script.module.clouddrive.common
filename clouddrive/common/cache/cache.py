@@ -49,8 +49,10 @@ class Cache(object):
             KodiUtils.mkdirs(profile_path)
         db = KodiUtils.translate_path("%s/cache_%s.db" % (profile_path, self._name,))
         con = sqlite3.connect(db, timeout=30, isolation_level=None)
-        con.execute('pragma journal_mode=wal;')
-        con.execute("create table if not exists cache(key text unique, value text, expiration integer)")
+        # Setup statements can meet a lock too: same retries as the queries.
+        name = 'cache_' + self._name
+        execute(name, con, self._monitor, lambda: self._abort, 'pragma journal_mode=wal')
+        execute(name, con, self._monitor, lambda: self._abort, "create table if not exists cache(key text unique, value text, expiration integer)")
         return con
 
     def _get_datetime(self, ts):
@@ -93,7 +95,7 @@ class Cache(object):
             with con:
                 # Expired rows are skipped when read, and deleted when something new is written.
                 if purge:
-                    execute('cache_' + self._name, con, self._monitor, lambda: self._abort, "delete from cache where expiration < ?", (self._now(),))
+                    execute('cache_' + self._name, con, self._monitor, lambda: self._abort, "delete from cache where expiration <= ?", (self._now(),))
                 return execute('cache_' + self._name, con, self._monitor, lambda: self._abort, query, data)
         finally:
             con.close()

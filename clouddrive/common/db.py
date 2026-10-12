@@ -86,8 +86,9 @@ class SimpleKeyValueDb(object):
             KodiUtils.mkdirs(self._base_path)
         db = KodiUtils.translate_path("%s/%s.db" % (self._base_path, self._name,))
         con = sqlite3.connect(db, timeout=30, isolation_level=None)
-        con.execute("pragma journal_mode=wal")
-        con.execute("create table if not exists store(key text unique, value text)")
+        # Setup statements can meet a lock too: same retries as the queries.
+        execute(self._name, con, self._monitor, lambda: self._abort, "pragma journal_mode=wal")
+        execute(self._name, con, self._monitor, lambda: self._abort, "create table if not exists store(key text unique, value text)")
         return con
 
     def get(self, key):
