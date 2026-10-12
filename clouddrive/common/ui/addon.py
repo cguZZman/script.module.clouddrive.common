@@ -45,6 +45,11 @@ from clouddrive.common.cache.cache import Cache
 
 class CloudDriveAddon:
     _DEFAULT_SIGNIN_TIMEOUT = 120
+    # The methods a plugin URL may run, by its "action" parameter. Plugins list their own in _plugin_actions.
+    _actions = ('_add_account', '_clear_cache', '_list_drive', '_list_exports', '_list_folder', '_open_common_settings',
+                '_open_export', '_remove_account', '_remove_drive', '_remove_export', '_run_export', '_search', '_slideshow',
+                'download', 'play')
+    _plugin_actions = ()
     _addon = None
     _addon_handle = None
     _addonid = None
@@ -686,6 +691,10 @@ class CloudDriveAddon:
             self._action = Utils.get_safe_value(self._addon_params, 'action')
             if self._action:
                 self._rename_action()
+                # URLs can come from anywhere (skins, favourites, other add-ons): only run the known actions.
+                if self._action not in self._actions and self._action not in self._plugin_actions:
+                    Logger.error('Unknown action: %s' % self._action)
+                    return
                 method = getattr(self, self._action)
                 arguments = {}
                 for name in inspect.getfullargspec(method)[0]:
