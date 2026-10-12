@@ -25,7 +25,7 @@ from calendar import weekday
 from clouddrive.common.remote.errorreport import ErrorReport
 from clouddrive.common.export import ExportManager
 from clouddrive.common.account import AccountManager
-from _collections import deque
+from collections import deque
 import os
 
 class ExportService(object):

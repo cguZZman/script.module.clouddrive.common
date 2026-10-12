@@ -93,7 +93,6 @@ class CloudDriveAddon:
         self._system_monitor = KodiUtils.get_system_monitor()
         self._account_manager = AccountManager(self._profile_path)
         self._pin_dialog = None
-        self.iskrypton = KodiUtils.get_home_property('iskrypton') == 'true'
         
         if len(sys.argv) > 1:
             self._addon_handle = int(sys.argv[1])
@@ -506,8 +505,7 @@ class CloudDriveAddon:
             wait_for_slideshow = True
         else:
             Logger.notice('Slideshow child count is the same, nothing to refresh...')
-        t = threading.Thread(target=self._refresh_slideshow, args=(driveid, item_driveid, item_id, path, new_change_token, wait_for_slideshow,))
-        t.setDaemon(True)
+        t = threading.Thread(target=self._refresh_slideshow, args=(driveid, item_driveid, item_id, path, new_change_token, wait_for_slideshow,), daemon=True)
         t.start()
     
     def _refresh_slideshow(self, driveid, item_driveid, item_id, path, change_token, wait_for_slideshow):
@@ -566,9 +564,7 @@ class CloudDriveAddon:
                 resume = details['resume']
                 if resume['position'] > 0:
                     play_resume = False
-                    if self.iskrypton:
-                        play_resume = KodiUtils.get_addon_setting('resume_playing') == 'true'
-                    elif KodiUtils.get_addon_setting('ask_resume') == 'true':
+                    if KodiUtils.get_addon_setting('ask_resume') == 'true':
                         d = datetime(1,1,1) + timedelta(seconds=resume['position'])
                         t = '%02d:%02d:%02d' % (d.hour, d.minute, d.second)
                         Logger.debug(t)
