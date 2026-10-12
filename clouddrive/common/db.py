@@ -25,16 +25,20 @@ from clouddrive.common.ui.logger import Logger
 from clouddrive.common.ui.utils import KodiUtils
 
 
+# Values are stored as JSON after this prefix. Earlier versions stored Python repr() text, which literal_eval reads
+# without running code. The prefix tells them apart without a failing json.loads: in Kodi, json's C decoder can raise
+# an exception class left over from an earlier add-on run, which fails with "NameError: ValueError".
+_JSON_PREFIX = 'json:'
+
+
 def to_text(value):
-    return json.dumps(value)
+    return _JSON_PREFIX + json.dumps(value)
 
 
 def from_text(text):
-    # Values are stored as JSON. Earlier versions stored Python repr() text, which literal_eval reads without running code.
-    try:
-        return json.loads(text)
-    except ValueError:
-        return ast.literal_eval(text)
+    if text.startswith(_JSON_PREFIX):
+        return json.loads(text[len(_JSON_PREFIX):])
+    return ast.literal_eval(text)
 
 
 def execute(name, con, monitor, is_aborted, query, data=None, fetchall=False):
