@@ -1,0 +1,32 @@
+name: Tests
+
+on: [push, pull_request]
+
+jobs:
+  tests:
+    # Python 3.8: Kodi 19 and 20; 3.12: newer Kodi versions.
+    runs-on: ubuntu-22.04
+    strategy:
+      matrix:
+        python: ['3.8', '3.12']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - run: pip install python-dateutil
+      - run: python -m unittest discover -s tests -t tests -v
+
+  addon-checker:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install kodi-addon-checker==0.0.36
+      # Check the files Kodi gets: the git archive, without tests and CI files.
+      - run: |
+          mkdir -p ../out/script.module.clouddrive.common
+          git archive HEAD | tar -x -C ../out/script.module.clouddrive.common
+          cd ../out && kodi-addon-checker --branch matrix script.module.clouddrive.common
