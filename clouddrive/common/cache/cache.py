@@ -29,14 +29,14 @@ from clouddrive.common.ui.utils import KodiUtils
 class Cache(object):
     _addonid = None
     _name = None
-    _expiration = None
+    _expiration_delta = None
     _monitor = None
     _abort = False
 
     def __init__(self, addonid, name, expiration):
         self._addonid = addonid
         self._name = name
-        self._expiration = expiration
+        self._expiration_delta = expiration
         self._monitor = KodiUtils.get_system_monitor()
 
     def __del__(self):
@@ -61,6 +61,11 @@ class Cache(object):
     def _now(self):
         return self._get_datetime(datetime.datetime.now())
 
+    def _expiration(self):
+        # Whole seconds, rounded up: an entry never expires before its time.
+        ts = datetime.datetime.now() + self._expiration_delta
+        return self._get_datetime(ts) + (1 if ts.microsecond else 0)
+
     def get(self, key):
         row = self._execute_sql("select value, expiration from cache where key = ?", (key,))
         if row and row[1] > self._now():
@@ -68,11 +73,11 @@ class Cache(object):
         return
 
     def set(self, key, value):
-        expiration = self._get_datetime(datetime.datetime.now() + self._expiration)
+        expiration = self._expiration()
         self._execute_sql("insert or replace into cache(key, value, expiration) values(?,?,?)", (key, to_text(value), expiration,), purge=True)
 
     def setmany(self, key_value_list):
-        expiration = self._get_datetime(datetime.datetime.now() + self._expiration)
+        expiration = self._expiration()
         rows = [(key, to_text(value), expiration) for key, value in key_value_list]
         self._execute_sql("insert or replace into cache(key, value, expiration) values(?,?,?)", rows, purge=True)
 

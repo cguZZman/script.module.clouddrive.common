@@ -91,10 +91,19 @@ class StorageTest(unittest.TestCase):
             locker.execute('commit')
 
     def test_cache_expires_and_purges_on_write(self):
+        # A controlled clock: the cache keeps whole seconds, so real sleeps made this test flaky.
+        import clouddrive.common.cache.cache as cache_module
+        clock = [datetime.datetime(2026, 10, 16, 12, 0, 0, 999000)]
+        fake = unittest.mock.MagicMock(timedelta=datetime.timedelta)
+        fake.datetime.now.side_effect = lambda: clock[0]
+        patcher = unittest.mock.patch.object(cache_module, 'datetime', fake)
+        patcher.start()
+        self.addCleanup(patcher.stop)
         cache = Cache('addon', 'items', datetime.timedelta(seconds=1))
         cache.setmany([['k1', {'n': 1}], ['k2', ['a']]])
-        self.assertEqual(cache.get('k1'), {'n': 1})
-        time.sleep(2.1)
+        clock[0] += datetime.timedelta(milliseconds=2)
+        self.assertEqual(cache.get('k1'), {'n': 1}, 'still valid just after a whole second ticks over')
+        clock[0] += datetime.timedelta(seconds=2)
         self.assertIsNone(cache.get('k1'))
         cache.set('k3', 'v')
         self.assertEqual([r[0] for r in sqlite3.connect(os.path.join(self.path, 'cache_items.db')).execute('select key from cache')], ['k3'])
