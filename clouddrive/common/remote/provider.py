@@ -150,6 +150,41 @@ class Provider(OAuth2):
         """Subtitle items stored next to the video called name, in the folder parent (as given in the item's 'parent')."""
         raise NotImplementedError()
     
+    def list_subtree(self, item_driveid, item_id):
+        """
+        Optional, to make library exports fast: the items, with download info, of the folder item_id and of every
+        folder below it, as {folder id: [items]}, in much fewer requests than one per folder. Items use their
+        folder's id as 'parent'. Return None when the service can't list a tree at once (folders are then listed one
+        by one), or if cancel_operation() is true.
+        """
+        return None
+
+    # Exports list every folder of a tree. With list_subtree, the first folder's call lists the whole tree and the
+    # other folders' items are kept here: each is handed out once, for a few minutes after the listing, so the
+    # long-running export service never reuses an old listing.
+    _SUBTREE_TTL = 600
+
+    def get_export_folder_items(self, item_driveid, item_id, on_before_add_item=None):
+        """The items, with download info, of the folder item_id for a library export."""
+        cache = self.__dict__.setdefault('_subtree_cache', {})
+        cached = cache.pop(item_id, None)
+        if cached and time.time() - cached[0] < self._SUBTREE_TTL:
+            items = cached[1]
+        else:
+            tree = self.list_subtree(item_driveid, item_id)
+            if self.cancel_operation():
+                return None
+            if tree is None:
+                return self.get_folder_items(item_driveid, item_id, include_download_info=True, on_before_add_item=on_before_add_item)
+            items = tree.pop(item_id, [])
+            listed = time.time()
+            for folder_id, folder_items in tree.items():
+                cache[folder_id] = (listed, folder_items)
+        if on_before_add_item:
+            for item in items:
+                on_before_add_item(item)
+        return items
+
     def cancel_operation(self):
         return False
 
