@@ -54,11 +54,13 @@ def execute(name, con, monitor, is_aborted, query, data=None, fetchall=False):
                 cur = con.execute(query)
             return cur.fetchall() if fetchall else cur.fetchone()
         except sqlite3.OperationalError as ex:
-            if 'database is locked' not in str(ex) or is_aborted():
+            if 'database is locked' not in str(ex) or is_aborted() or monitor.abortRequested():
                 Logger.debug('db [%s] - error executing query [%s]: %s' % (name, query, ex))
                 return None
             Logger.debug('db [%s] - database locked, retry %d: [%s]' % (name, attempt + 1, query))
-            monitor.waitForAbort(0.3)
+            # Kodi is shutting down: stop retrying.
+            if monitor.waitForAbort(0.3):
+                return None
         except Exception as ex:
             Logger.debug('db [%s] - error executing query [%s]: %s' % (name, query, ex))
             return None

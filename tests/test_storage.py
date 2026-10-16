@@ -67,6 +67,29 @@ class StorageTest(unittest.TestCase):
         self.assertEqual(len(attempts), 2)
         self.assertEqual(db.get('b'), {'x': 1})
 
+    def test_shutdown_stops_the_retries(self):
+        db = SimpleKeyValueDb(self.path, 'accounts')
+        db.set('a', 1)
+        locker = sqlite3.connect(os.path.join(self.path, 'accounts.db'), isolation_level=None, check_same_thread=False)
+        locker.execute('begin exclusive')
+        attempts = []
+        real_connect = sqlite3.connect
+
+        def connect(*args, **kwargs):
+            kwargs['timeout'] = 0.01
+            return real_connect(*args, **kwargs)
+
+        def wait(seconds):
+            attempts.append(seconds)
+            return True  # Kodi asked to stop.
+        db._monitor.waitForAbort = wait
+        try:
+            with unittest.mock.patch('sqlite3.connect', side_effect=connect):
+                self.assertIsNone(db._execute_sql("insert or replace into store(key, value) values('b', 'x')"))
+            self.assertEqual(len(attempts), 1)
+        finally:
+            locker.execute('commit')
+
     def test_cache_expires_and_purges_on_write(self):
         cache = Cache('addon', 'items', datetime.timedelta(seconds=1))
         cache.setmany([['k1', {'n': 1}], ['k2', ['a']]])

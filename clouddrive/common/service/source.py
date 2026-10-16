@@ -368,7 +368,8 @@ class Source(BaseHandler):
             cached_page['pending'] = False
             content_value = None
             if 'content' in cached_page:
-                content_value = cached_page['content'].getvalue()
+                # Stored as text: the page cache keeps JSON.
+                content_value = Utils.str(cached_page['content'].getvalue())
             self.write_response(cached_page['response_code'], content=Utils.get_safe_value(cached_page, 'content'), headers=Utils.get_safe_value(cached_page, 'headers', {}))
             cached_page['content'] = content_value
             if Utils.get_safe_value(cached_page, 'response_code', 0) >= 500:
