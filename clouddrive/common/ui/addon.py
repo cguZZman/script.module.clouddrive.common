@@ -346,7 +346,7 @@ class CloudDriveAddon:
                 if 'url' in item:
                     url = item['url']
                 else:
-                    url = self._get_item_play_url(urllib.parse.quote(Utils.str(item_name)), driveid, item_driveid, item_id)
+                    url = self._get_item_play_url(item_name, driveid, item_driveid, item_id)
                 if 'image' in item:
                     info.update(item['image'])
                 list_item.setInfo('pictures', info)
@@ -448,6 +448,7 @@ class CloudDriveAddon:
             Logger.debug('Abort requested...')
             
     def _get_item_play_url(self, file_name, driveid, item_driveid=None, item_id=None, is_subtitle=False):
+        # file_name as it is (not URL-encoded): it is encoded here, once.
         return DownloadServiceUtil.build_download_url(driveid, item_driveid, item_id, urllib.parse.quote(Utils.str(file_name)))
     
     def play(self, driveid, item_driveid=None, item_id=None):
@@ -499,7 +500,7 @@ class CloudDriveAddon:
         if find_subtitles and 'subtitles' in item:
             subtitles = []
             for subtitle in item['subtitles']:
-                subtitles.append(self._get_item_play_url(urllib.parse.quote(Utils.str(subtitle['name'])), driveid, Utils.default(Utils.get_safe_value(subtitle, 'drive_id'), driveid), subtitle['id'], True))
+                subtitles.append(self._get_item_play_url(subtitle['name'], driveid, Utils.default(Utils.get_safe_value(subtitle, 'drive_id'), driveid), subtitle['id'], True))
             list_item.setSubtitles(subtitles)
         if not self.cancel_operation():
             xbmcplugin.setResolvedUrl(self._addon_handle, succeeded, list_item)
