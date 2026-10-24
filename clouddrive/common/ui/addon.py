@@ -187,9 +187,28 @@ class CloudDriveAddon:
     
     def _remove_account(self, driveid):
         account = self._account_manager.get_by_driveid('account', driveid)
-        if self._dialog.yesno(self._addon_name, self._common_addon.getLocalizedString(32022) % self._get_display_name(account, with_format=True)):
-            self._account_manager.remove_account(account['id'])
-            KodiUtils.executebuiltin('Container.Refresh')
+        name = self._get_display_name(account, with_format=True)
+        revoke = False
+        if self._provider.revoke_supported:
+            # Revoking also signs out the user's other devices using the same account, so it's the user's choice.
+            company = self._provider.signin_company
+            choice = self._dialog.select(self._common_addon.getLocalizedString(32092) % name, [
+                self._common_addon.getLocalizedString(32089),
+                self._common_addon.getLocalizedString(32090) % company])
+            if choice < 0:
+                return
+            revoke = choice == 1
+        elif not self._dialog.yesno(self._addon_name, self._common_addon.getLocalizedString(32022) % name):
+            return
+        if revoke:
+            try:
+                self._provider.configure(self._account_manager, driveid)
+                self._provider.revoke_access()
+            except Exception as e:
+                Logger.notice('Access could not be revoked: %s' % ExceptionUtils.full_stacktrace(e))
+                self._dialog.ok(self._addon_name, self._common_addon.getLocalizedString(32091) % company)
+        self._account_manager.remove_account(account['id'])
+        KodiUtils.executebuiltin('Container.Refresh')
         
     def _list_drive(self, driveid):
         drive_folders = self.get_custom_drive_folders(driveid)

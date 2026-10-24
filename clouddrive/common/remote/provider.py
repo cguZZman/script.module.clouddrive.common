@@ -58,6 +58,10 @@ class Provider(OAuth2):
     """
     name = ''
     source_mode = False
+    # Providers that can revoke an account's tokens (revoke_access) set this, and the company the user signs in
+    # with, for messages ("Google").
+    revoke_supported = False
+    signin_company = ''
     download_requires_auth = False
     _signin = Signin()
     _account_manager = None
@@ -121,6 +125,12 @@ class Provider(OAuth2):
         drive['change_token'] = change_token
         self._account_manager.save_drive(drive)
     
+    def revoke_access(self):
+        """
+        Revokes the configured account's tokens at the provider, so they stop working everywhere. Raises on failure.
+        """
+        raise NotImplementedError()
+
     def get_account(self, request_params=None, access_tokens=None):
         raise NotImplementedError()
     
