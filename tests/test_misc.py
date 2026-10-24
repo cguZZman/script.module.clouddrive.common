@@ -34,9 +34,9 @@ class Addon(CloudDriveAddon):
 
 
 class RemoveAccountTest(unittest.TestCase):
-    STRINGS = {32022: "Remove '%s'?", 32089: 'Remove from this Kodi only', 32090: 'Remove and revoke at %s', 32091: 'Not revoked at %s', 32092: "Remove account '%s'"}
+    STRINGS = {32022: "Remove '%s'?", 32089: 'Remove from this Kodi only', 32090: 'Remove and revoke at %s', 32091: 'Not revoked at %s', 32092: "Remove account '%s'", 32093: "Revoke this Kodi's access at %s"}
 
-    def remove(self, revoke_supported=True, select=0, yesno=True, revoke_error=None):
+    def remove(self, revoke_supported=True, select=0, yesno=True, revoke_error=None, ends_all=True):
         addon = object.__new__(Addon)
         addon._addon_name = 'Test'
         addon._account_manager = mock.MagicMock()
@@ -47,7 +47,7 @@ class RemoveAccountTest(unittest.TestCase):
         addon._dialog = mock.MagicMock()
         addon._dialog.select.return_value = select
         addon._dialog.yesno.return_value = yesno
-        addon._provider = mock.MagicMock(revoke_supported=revoke_supported, signin_company='Google')
+        addon._provider = mock.MagicMock(revoke_supported=revoke_supported, signin_company='Google', revoke_ends_all_sign_ins=ends_all)
         if revoke_error:
             addon._provider.revoke_access.side_effect = revoke_error
         with mock.patch('clouddrive.common.ui.addon.KodiUtils.executebuiltin'):
@@ -59,6 +59,10 @@ class RemoveAccountTest(unittest.TestCase):
         addon._dialog.select.assert_called_once_with("Remove account 'User'", ['Remove from this Kodi only', 'Remove and revoke at Google'])
         addon._provider.revoke_access.assert_not_called()
         addon._account_manager.remove_account.assert_called_once_with('account-1')
+
+    def test_warns_about_other_devices_only_when_revoking_ends_them(self):
+        addon = self.remove(select=-1, ends_all=False)
+        addon._dialog.select.assert_called_once_with("Remove account 'User'", ['Remove from this Kodi only', "Revoke this Kodi's access at Google"])
 
     def test_revokes_when_chosen(self):
         addon = self.remove(select=1)

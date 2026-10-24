@@ -264,3 +264,7 @@ msgstr "Não foi possível revogar o acesso. Você pode removê-lo nas configura
 msgctxt "#32092"
 msgid "Remove account '%s'"
 msgstr "Remover a conta '%s'"
+
+msgctxt "#32093"
+msgid "Remove and revoke this Kodi's access at %s"
+msgstr "Remover e revogar o acesso deste Kodi no %s"

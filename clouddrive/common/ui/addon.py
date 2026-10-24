@@ -192,9 +192,10 @@ class CloudDriveAddon:
         if self._provider.revoke_supported:
             # Revoking also signs out the user's other devices using the same account, so it's the user's choice.
             company = self._provider.signin_company
+            revoke_label = 32090 if self._provider.revoke_ends_all_sign_ins else 32093
             choice = self._dialog.select(self._common_addon.getLocalizedString(32092) % name, [
                 self._common_addon.getLocalizedString(32089),
-                self._common_addon.getLocalizedString(32090) % company])
+                self._common_addon.getLocalizedString(revoke_label) % company])
             if choice < 0:
                 return
             revoke = choice == 1

@@ -62,6 +62,9 @@ class Provider(OAuth2):
     # with, for messages ("Google").
     revoke_supported = False
     signin_company = ''
+    # True when revoking ends every sign-in of the account with this app, on all devices (Google); False when it
+    # only ends this device's (Dropbox). The remove dialog warns about other devices only in the first case.
+    revoke_ends_all_sign_ins = True
     download_requires_auth = False
     _signin = Signin()
     _account_manager = None
