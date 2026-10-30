@@ -110,6 +110,10 @@ class CloudDriveAddon:
             xbmcplugin.addSortMethod(handle=self._addon_handle, sortMethod=xbmcplugin.SORT_METHOD_SIZE )
             xbmcplugin.addSortMethod(handle=self._addon_handle, sortMethod=xbmcplugin.SORT_METHOD_DATE )
             xbmcplugin.addSortMethod(handle=self._addon_handle, sortMethod=xbmcplugin.SORT_METHOD_DURATION )
+            if self._content_type == 'audio':
+                # Albums in their order: by the track number in the files' tags, or by file name ("01 - ...").
+                xbmcplugin.addSortMethod(handle=self._addon_handle, sortMethod=xbmcplugin.SORT_METHOD_TRACKNUM)
+                xbmcplugin.addSortMethod(handle=self._addon_handle, sortMethod=xbmcplugin.SORT_METHOD_FILE)
     
     def __del__(self):
         del self._addon
