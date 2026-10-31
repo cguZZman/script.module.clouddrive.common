@@ -1,9 +1,12 @@
+import re
 import unittest
+from unittest import mock
 from urllib.error import HTTPError, URLError
 
 import kodistubs
 from clouddrive.common.account import AccountNotFoundException
 from clouddrive.common.exception import RequestException, UIException
+from clouddrive.common.ui.addon import CloudDriveAddon
 from clouddrive.common.ui.errors import ErrorMessage, ErrorMessages
 
 SERVER = 'https://drive.signinserver.com'
@@ -52,3 +55,39 @@ class ErrorMessagesTest(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class EnglishAddon(kodistubs.FakeAddon):
+    # The real English texts: their %s must match what the code passes.
+    with open('resources/language/resource.language.en_gb/strings.po', encoding='utf-8') as po:
+        TEXTS = {int(m.group(1)): m.group(2) for m in re.finditer(r'msgctxt "#(\d+)"\s*\nmsgid "((?:[^"\\]|\\.)*)"', po.read())}
+
+    def getLocalizedString(self, string_id):
+        return self.TEXTS[string_id]
+
+
+class Addon(CloudDriveAddon):
+    # Built without the constructor, which needs Kodi: nothing to release.
+    def __del__(self):
+        pass
+
+
+class ErrorDialogTest(unittest.TestCase):
+    def test_rejected_token_asks_to_sign_in_again(self):
+        addon = object.__new__(Addon)
+        addon._common_addon = EnglishAddon()
+        addon._addon_params = {'driveid': 'd'}
+        addon._addon_url = 'plugin://test/'
+        addon._addon_name = addon._addonid = 'test'
+        addon._addon_version = addon._common_addon_version = '1'
+        addon._content_type = 'video'
+        addon._signin = None
+        addon._dialog = mock.MagicMock()
+        addon._dialog.yesno.return_value = False
+        addon._account_manager = mock.MagicMock()
+        addon._get_display_name = lambda account, drive=None, with_format=False: 'Carlos'
+        with mock.patch('clouddrive.common.ui.addon.KodiUtils.get_signin_server', return_value=SERVER):
+            addon._handle_exception(request_error('https://api.example.com/x', 401))
+        text = addon._dialog.yesno.call_args[0][1]
+        self.assertEqual(text, "The credentials for 'Carlos' are no longer valid. You need to sign in again.\nDo you want to start the process?")
+        addon._dialog.ok.assert_not_called()

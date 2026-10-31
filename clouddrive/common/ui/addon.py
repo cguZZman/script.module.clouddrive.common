@@ -598,7 +598,7 @@ class CloudDriveAddon:
             show_error_dialog = False
             account = self._account_manager.get_by_driveid('account', driveid)
             drive = self._account_manager.get_by_driveid('drive', driveid, account)
-            if self._dialog.yesno(self._addon_name, self._common_addon.getLocalizedString(32046) % (self._get_display_name(account, drive, True) + '\n')):
+            if self._dialog.yesno(self._addon_name, self._common_addon.getLocalizedString(32046) % (self._get_display_name(account, drive, True), '\n')):
                 KodiUtils.executebuiltin(add_account_cmd)
 
         report = '[%s] [%s]/[%s]\n\n%s\n%s\n%s\n\n%s' % (self._addonid, self._addon_version, self._common_addon_version, message.line1, message.line2, message.line3, stacktrace)
