@@ -163,3 +163,60 @@ class NextPageItemTest(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class ExportsMenuTest(unittest.TestCase):
+    EXPORTS = {'e1': {'id': 'e1', 'name': 'Movies', 'driveid': 'kept', 'item_driveid': 'kept', 'content_type': 'video'},
+               'e2': {'id': 'e2', 'name': 'Old', 'driveid': 'removed', 'item_driveid': 'removed', 'content_type': 'video'},
+               'e3': {'id': 'e3', 'name': 'Music', 'driveid': 'removed', 'item_driveid': 'removed', 'content_type': 'audio'}}
+
+    def addon(self, content_type='video'):
+        addon = object.__new__(Addon)
+        addon._addon_url = 'plugin://test/'
+        addon._content_type = content_type
+        addon._addon_handle = 1
+        addon._profile_path = '/profile'
+        addon._common_addon = kodistubs.FakeAddon()
+        addon._account_manager = mock.MagicMock()
+        addon._account_manager.get_accounts.return_value = {'a': {'id': 'a', 'drives': [{'id': 'kept'}]}}
+        addon._get_display_name = lambda account, drive=None, with_format=False: 'User'
+        addon.cancel_operation = lambda: False
+        return addon
+
+    def run(self, result=None):
+        with mock.patch('clouddrive.common.ui.addon.ExportManager') as manager:
+            manager.return_value.get_exports.return_value = self.EXPORTS
+            with mock.patch('clouddrive.common.ui.addon.xbmcplugin') as self.xbmcplugin, mock.patch('clouddrive.common.ui.addon.xbmcgui') as xbmcgui:
+                xbmcgui.ListItem.side_effect = lambda label: mock.MagicMock(label=label)
+                return super(ExportsMenuTest, self).run(result)
+
+    def listing(self):
+        return [(item.label, dict(urllib.parse.parse_qsl(urllib.parse.urlparse(url).query))) for url, item, *rest in self.xbmcplugin.addDirectoryItems.call_args[0][1]]
+
+    def test_exports_of_removed_accounts_can_be_removed(self):
+        addon = self.addon()
+        addon.list_accounts()
+        labels = [label for label, params in self.listing()]
+        self.assertEqual(labels, ['User', '#32096', '#32005'])
+        addon._list_exports()
+        [(label, params)] = self.listing()
+        self.assertEqual((label, params['action'], params['item_id']), ('Old', '_remove_export', 'e2'))
+
+    def test_no_entry_without_removed_accounts(self):
+        addon = self.addon()
+        addon._account_manager.get_accounts.return_value['b'] = {'id': 'b', 'drives': [{'id': 'removed'}]}
+        addon.list_accounts()
+        self.assertNotIn('#32096', [label for label, params in self.listing()])
+
+    def test_drives_without_a_menu_list_their_exports_after_the_files(self):
+        addon = self.addon()
+        addon.get_custom_drive_folders = lambda driveid: []
+        addon._list_folder = lambda driveid, path=None: addon._process_items([], driveid)
+        addon._list_drive('kept')
+        [(label, params)] = self.listing()
+        self.assertEqual((label, params['action'], params['driveid']), ('#32000', '_list_exports', 'kept'))
+        addon = self.addon()
+        addon.get_custom_drive_folders = lambda driveid: []
+        addon._list_folder = lambda driveid, path=None: addon._process_items([], driveid)
+        addon._list_drive('other')
+        self.assertEqual(self.listing(), [], 'no exports, no entry')

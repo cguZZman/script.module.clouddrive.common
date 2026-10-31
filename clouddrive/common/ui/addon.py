@@ -66,6 +66,8 @@ class CloudDriveAddon:
     _load_count = 0
     # Set while listing for the slideshow: its subfolders are listed whole and fresh too.
     _fresh_listing = False
+    # Items added after a folder's files: the exports of a drive without a menu.
+    _extra_items = ()
     _profile_path = None
     _progress_dialog = None
     _progress_dialog_bg = None
@@ -171,6 +173,10 @@ class CloudDriveAddon:
                 params = {'action':'_list_drive', 'content_type': self._content_type, 'driveid': drive['id']}
                 url = self._addon_url + '?' + urllib.parse.urlencode(params)
                 listing.append((url, list_item, True))
+        if self._get_exports(None):
+            # Exports stay when their account is removed: they can be removed here.
+            url = self._addon_url + '?' + urllib.parse.urlencode({'action':'_list_exports', 'content_type': self._content_type})
+            listing.append((url, xbmcgui.ListItem(self._common_addon.getLocalizedString(32096)), True))
         list_item = xbmcgui.ListItem(self._common_addon.getLocalizedString(32005))
         params = {'action':'_add_account', 'content_type': self._content_type}
         url = self._addon_url + '?' + urllib.parse.urlencode(params)
@@ -243,26 +249,43 @@ class CloudDriveAddon:
             xbmcplugin.addDirectoryItems(self._addon_handle, listing, len(listing))
             xbmcplugin.endOfDirectory(self._addon_handle, True)
         else:
+            if self._get_exports(driveid):
+                # Without a menu for the drive, its exports are listed after its files.
+                url = self._addon_url + '?' + urllib.parse.urlencode({'action':'_list_exports', 'content_type': self._content_type, 'driveid': driveid})
+                self._extra_items = [(url, xbmcgui.ListItem(self._common_addon.getLocalizedString(32000)), True)]
             self._list_folder(driveid, path='/')
 
-    def _list_exports(self, driveid):
-        self._export_manager = ExportManager(self._profile_path)
-        exports = self._export_manager.get_exports()
+    def _get_exports(self, driveid):
+        # The exports of the drive and content type; with driveid None, those whose account was removed.
+        if self._content_type != 'video' and self._content_type != 'audio':
+            return []
+        exports = ExportManager(self._profile_path).get_exports()
+        if driveid is None:
+            driveids = set(drive['id'] for account in self._account_manager.get_accounts().values() for drive in account['drives'])
+            matches = lambda export: export['driveid'] not in driveids
+        else:
+            matches = lambda export: export['driveid'] == driveid
+        return [export for export in exports.values() if matches(export) and export['content_type'] == self._content_type]
+
+    def _list_exports(self, driveid=None):
         listing = []
-        for exportid in exports:
-            export = exports[exportid]
-            if export['driveid'] == driveid and export['content_type'] == self._content_type:
-                item_name = Utils.unicode(export['name'])
-                params = {'action':'_open_export', 'content_type': self._content_type, 'driveid': driveid, 'item_driveid': export['item_driveid'], 'item_id': export['id'], 'name': urllib.parse.quote(Utils.str(item_name))}
-                url = self._addon_url + '?' + urllib.parse.urlencode(params)
-                list_item = xbmcgui.ListItem(item_name)
-                context_options = []
-                params['action'] = '_run_export'
-                context_options.append((KodiUtils.localize(21479), 'RunPlugin('+self._addon_url + '?' + urllib.parse.urlencode(params)+')'))
-                params['action'] = '_remove_export'
-                context_options.append((KodiUtils.localize(1210), 'RunPlugin('+self._addon_url + '?' + urllib.parse.urlencode(params)+')'))
-                list_item.addContextMenuItems(context_options)
-                listing.append((url, list_item, True))
+        for export in self._get_exports(driveid):
+            item_name = Utils.unicode(export['name'])
+            list_item = xbmcgui.ListItem(item_name)
+            if driveid is None:
+                # The account was removed: the export can only be removed.
+                params = {'action':'_remove_export', 'content_type': self._content_type, 'driveid': export['driveid'], 'item_id': export['id']}
+                listing.append((self._addon_url + '?' + urllib.parse.urlencode(params), list_item, False))
+                continue
+            params = {'action':'_open_export', 'content_type': self._content_type, 'driveid': driveid, 'item_driveid': export['item_driveid'], 'item_id': export['id'], 'name': urllib.parse.quote(Utils.str(item_name))}
+            url = self._addon_url + '?' + urllib.parse.urlencode(params)
+            context_options = []
+            params['action'] = '_run_export'
+            context_options.append((KodiUtils.localize(21479), 'RunPlugin('+self._addon_url + '?' + urllib.parse.urlencode(params)+')'))
+            params['action'] = '_remove_export'
+            context_options.append((KodiUtils.localize(1210), 'RunPlugin('+self._addon_url + '?' + urllib.parse.urlencode(params)+')'))
+            list_item.addContextMenuItems(context_options)
+            listing.append((url, list_item, True))
         xbmcplugin.addDirectoryItems(self._addon_handle, listing, len(listing))
         xbmcplugin.endOfDirectory(self._addon_handle, True)
     
@@ -420,6 +443,9 @@ class CloudDriveAddon:
                     list_item.setProperty('mimetype', mimetype)
                 
                 listing.append((url, list_item, is_folder))
+        for url, list_item, is_folder in self._extra_items:
+            list_item.setProperty('SpecialSort', 'bottom')
+            listing.append((url, list_item, is_folder))
         if next_page_url:
             list_item = xbmcgui.ListItem(self._common_addon.getLocalizedString(32094))
             # Last, whatever the sort.

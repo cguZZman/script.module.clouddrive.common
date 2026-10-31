@@ -381,5 +381,9 @@ msgid "Next page"
 msgstr ""
 
 msgctxt "#32095"
-msgid "Export '%s' skipped: its account was removed. Add the account again, or remove the export."
+msgid "Export '%s' skipped: its account was removed. Add the account again, or remove the export in Exports of removed accounts."
+msgstr ""
+
+msgctxt "#32096"
+msgid "Exports of removed accounts"
 msgstr ""
