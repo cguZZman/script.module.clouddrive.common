@@ -66,8 +66,6 @@ class CloudDriveAddon:
     _load_count = 0
     # Set while listing for the slideshow: its subfolders are listed whole and fresh too.
     _fresh_listing = False
-    # Items added after a folder's files: the exports of a drive without a menu.
-    _extra_items = ()
     _profile_path = None
     _progress_dialog = None
     _progress_dialog_bg = None
@@ -224,36 +222,29 @@ class CloudDriveAddon:
         KodiUtils.executebuiltin('Container.Refresh')
         
     def _list_drive(self, driveid):
-        drive_folders = self.get_custom_drive_folders(driveid)
+        # The same menu for every drive, so its exports and search are always at hand, whatever its own folders.
+        drive_folders = Utils.default(self.get_custom_drive_folders(driveid), [])
         if self.cancel_operation():
             return
-        if drive_folders:
-            listing = []
-            url = self._addon_url + '?' + urllib.parse.urlencode({'action':'_list_folder', 'path': '/', 'content_type': self._content_type, 'driveid': driveid})
-            listing.append((url, xbmcgui.ListItem('[B]%s[/B]' % self.get_my_files_menu_name()), True))
-            for folder in drive_folders:
-                params = {'action':'_list_folder', 'path': folder['path'], 'content_type': self._content_type, 'driveid': driveid}
-                if 'params' in folder:
-                    params.update(folder['params'])
-                url = self._addon_url + '?' + urllib.parse.urlencode(params)
-                list_item = xbmcgui.ListItem(Utils.unicode(folder['name']))
-                if 'context_options' in folder:
-                    list_item.addContextMenuItems(folder['context_options'])
-                listing.append((url, list_item, True))
-            if self._content_type == 'video' or self._content_type == 'audio':
-                url = self._addon_url + '?' + urllib.parse.urlencode({'action':'_list_exports', 'content_type': self._content_type, 'driveid': driveid})
-                listing.append((url, xbmcgui.ListItem(self._common_addon.getLocalizedString(32000)), True))
-            url = self._addon_url + '?' + urllib.parse.urlencode({'action':'_search', 'content_type': self._content_type, 'driveid': driveid})
-            listing.append((url, xbmcgui.ListItem(self._common_addon.getLocalizedString(32039)), True))
-            
-            xbmcplugin.addDirectoryItems(self._addon_handle, listing, len(listing))
-            xbmcplugin.endOfDirectory(self._addon_handle, True)
-        else:
-            if self._get_exports(driveid):
-                # Without a menu for the drive, its exports are listed after its files.
-                url = self._addon_url + '?' + urllib.parse.urlencode({'action':'_list_exports', 'content_type': self._content_type, 'driveid': driveid})
-                self._extra_items = [(url, xbmcgui.ListItem(self._common_addon.getLocalizedString(32000)), True)]
-            self._list_folder(driveid, path='/')
+        listing = []
+        url = self._addon_url + '?' + urllib.parse.urlencode({'action':'_list_folder', 'path': '/', 'content_type': self._content_type, 'driveid': driveid})
+        listing.append((url, xbmcgui.ListItem('[B]%s[/B]' % self.get_my_files_menu_name()), True))
+        for folder in drive_folders:
+            params = {'action':'_list_folder', 'path': folder['path'], 'content_type': self._content_type, 'driveid': driveid}
+            if 'params' in folder:
+                params.update(folder['params'])
+            url = self._addon_url + '?' + urllib.parse.urlencode(params)
+            list_item = xbmcgui.ListItem(Utils.unicode(folder['name']))
+            if 'context_options' in folder:
+                list_item.addContextMenuItems(folder['context_options'])
+            listing.append((url, list_item, True))
+        if self._content_type == 'video' or self._content_type == 'audio':
+            url = self._addon_url + '?' + urllib.parse.urlencode({'action':'_list_exports', 'content_type': self._content_type, 'driveid': driveid})
+            listing.append((url, xbmcgui.ListItem(self._common_addon.getLocalizedString(32000)), True))
+        url = self._addon_url + '?' + urllib.parse.urlencode({'action':'_search', 'content_type': self._content_type, 'driveid': driveid})
+        listing.append((url, xbmcgui.ListItem(self._common_addon.getLocalizedString(32039)), True))
+        xbmcplugin.addDirectoryItems(self._addon_handle, listing, len(listing))
+        xbmcplugin.endOfDirectory(self._addon_handle, True)
 
     def _get_exports(self, driveid):
         # The exports of the drive and content type; with driveid None, those whose account was removed.
@@ -443,9 +434,6 @@ class CloudDriveAddon:
                     list_item.setProperty('mimetype', mimetype)
                 
                 listing.append((url, list_item, is_folder))
-        for url, list_item, is_folder in self._extra_items:
-            list_item.setProperty('SpecialSort', 'bottom')
-            listing.append((url, list_item, is_folder))
         if next_page_url:
             list_item = xbmcgui.ListItem(self._common_addon.getLocalizedString(32094))
             # Last, whatever the sort.

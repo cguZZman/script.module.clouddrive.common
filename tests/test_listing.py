@@ -208,15 +208,9 @@ class ExportsMenuTest(unittest.TestCase):
         addon.list_accounts()
         self.assertNotIn('#32096', [label for label, params in self.listing()])
 
-    def test_drives_without_a_menu_list_their_exports_after_the_files(self):
-        addon = self.addon()
-        addon.get_custom_drive_folders = lambda driveid: []
-        addon._list_folder = lambda driveid, path=None: addon._process_items([], driveid)
-        addon._list_drive('kept')
-        [(label, params)] = self.listing()
-        self.assertEqual((label, params['action'], params['driveid']), ('#32000', '_list_exports', 'kept'))
-        addon = self.addon()
-        addon.get_custom_drive_folders = lambda driveid: []
-        addon._list_folder = lambda driveid, path=None: addon._process_items([], driveid)
-        addon._list_drive('other')
-        self.assertEqual(self.listing(), [], 'no exports, no entry')
+    def test_drives_without_their_own_folders_have_the_menu(self):
+        for content_type, labels in (('video', ['[B]#32052[/B]', '#32000', '#32039']), ('image', ['[B]#32052[/B]', '#32039'])):
+            addon = self.addon(content_type)
+            addon.get_custom_drive_folders = lambda driveid: []
+            addon._list_drive('kept')
+            self.assertEqual([label for label, params in self.listing()], labels)
