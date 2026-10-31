@@ -268,3 +268,7 @@ msgstr "Remover a conta '%s'"
 msgctxt "#32093"
 msgid "Remove and revoke this Kodi's access at %s"
 msgstr "Remover e revogar o acesso deste Kodi no %s"
+
+msgctxt "#32094"
+msgid "Next page"
+msgstr "Próxima página"

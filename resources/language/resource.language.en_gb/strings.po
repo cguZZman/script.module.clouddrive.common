@@ -375,3 +375,7 @@ msgstr ""
 msgctxt "#32093"
 msgid "Remove and revoke this Kodi's access at %s"
 msgstr ""
+
+msgctxt "#32094"
+msgid "Next page"
+msgstr ""

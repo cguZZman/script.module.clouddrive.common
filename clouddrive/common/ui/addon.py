@@ -64,6 +64,8 @@ class CloudDriveAddon:
     _auto_refreshed_slideshow_supported = True
     _load_target = 0
     _load_count = 0
+    # Set while listing for the slideshow: its subfolders are listed whole and fresh too.
+    _fresh_listing = False
     _profile_path = None
     _progress_dialog = None
     _progress_dialog_bg = None
@@ -301,20 +303,54 @@ class CloudDriveAddon:
         else:
             self._progress_dialog_bg.update(100, self._addon_name, self._common_addon.getLocalizedString(32048) % Utils.str(self._load_count))
             
-    def _list_folder(self, driveid, item_driveid=None, item_id=None, path=None):
-        self.get_provider().configure(self._account_manager, driveid)
-        if self._child_count_supported:
-            item = self.get_provider().get_item(item_driveid, item_id, path)
-            if item:
-                self._load_target = item['folder']['child_count']
-                self._progress_dialog_bg.create(self._addon_name, self._common_addon.getLocalizedString(32049) % Utils.str(self._load_target))
+    def _get_page_size(self):
+        # Items per page when browsing; 0 lists whole folders.
+        try:
+            return max(0, int(KodiUtils.get_addon_setting('page_size')))
+        except ValueError:
+            return 500
+
+    def _get_listing_cache(self):
+        # Going back to a folder (after viewing a picture, for example) doesn't list it again for a few minutes.
+        minutes = KodiUtils.get_cache_expiration_time()
+        return Cache(self._addonid, 'listing', timedelta(minutes=minutes)) if minutes > 0 else None
+
+    def _list_folder(self, driveid, item_driveid=None, item_id=None, path=None, page_token=None, fresh=None):
+        provider = self.get_provider()
+        provider.configure(self._account_manager, driveid)
+        # The slideshow lists folders whole and fresh: it shows all the pictures, and refreshes when they change.
+        self._fresh_listing = fresh == 'true'
+        page_size = self._get_page_size() if provider.folder_paging_supported and not self._fresh_listing else 0
+        cache = None if self._fresh_listing else self._get_listing_cache()
+        key = '|'.join(Utils.str(value) for value in (driveid, item_driveid, item_id, path, page_size, page_token))
+        listing = cache.get(key) if cache else None
+        if not listing:
+            if self._child_count_supported:
+                item = None if page_token else provider.get_item(item_driveid, item_id, path)
+                if item or page_token:
+                    self._load_target = item['folder']['child_count'] if item else page_size
+                    if page_size:
+                        self._load_target = min(self._load_target, page_size)
+                    self._progress_dialog_bg.create(self._addon_name, self._common_addon.getLocalizedString(32049) % Utils.str(self._load_target))
+            if page_size:
+                page = provider.get_folder_page(item_driveid, item_id, path, page_size, page_token, on_items_page_completed = self.on_items_page_completed)
+            else:
+                page = provider.get_folder_items(item_driveid, item_id, path, on_items_page_completed = self.on_items_page_completed), None
+            if self.cancel_operation():
+                return
+            listing = {'items': page[0], 'next_page_token': page[1]}
+            if cache:
+                cache.set(key, listing)
+        next_page_url = None
+        if listing['next_page_token']:
+            params = {'action': '_list_folder', 'content_type': self._content_type, 'driveid': driveid, 'page_token': listing['next_page_token']}
+            for name, value in (('item_driveid', item_driveid), ('item_id', item_id), ('path', path)):
+                if value:
+                    params[name] = value
+            next_page_url = self._addon_url + '?' + urllib.parse.urlencode(params)
+        self._process_items(listing['items'], driveid, next_page_url)
         
-        items = self.get_provider().get_folder_items(item_driveid, item_id, path, on_items_page_completed = self.on_items_page_completed)
-        if self.cancel_operation():
-            return
-        self._process_items(items, driveid)
-        
-    def _process_items(self, items, driveid):
+    def _process_items(self, items, driveid, next_page_url=None):
         listing = []
         for item in items:
             Logger.debug(item)
@@ -332,7 +368,7 @@ class CloudDriveAddon:
             info = {'size': item['size'], 'date': KodiUtils.to_kodi_item_date_str(KodiUtils.to_datetime(Utils.get_safe_value(item, 'last_modified_date')))}
             if is_folder:
                 params['action'] = '_list_folder'
-                url = self._addon_url + '?' + urllib.parse.urlencode(params)
+                url = self._addon_url + '?' + urllib.parse.urlencode(dict(params, fresh='true') if self._fresh_listing else params)
                 params['action'] = '_search'
                 cmd = 'ActivateWindow(%d,%s?%s)' % (xbmcgui.getCurrentWindowId(), self._addon_url, urllib.parse.urlencode(params))
                 context_options.append((self._common_addon.getLocalizedString(32039), cmd))
@@ -384,6 +420,11 @@ class CloudDriveAddon:
                     list_item.setProperty('mimetype', mimetype)
                 
                 listing.append((url, list_item, is_folder))
+        if next_page_url:
+            list_item = xbmcgui.ListItem(self._common_addon.getLocalizedString(32094))
+            # Last, whatever the sort.
+            list_item.setProperty('SpecialSort', 'bottom')
+            listing.append((next_page_url, list_item, True))
         xbmcplugin.addDirectoryItems(self._addon_handle, listing, len(listing))
         xbmcplugin.endOfDirectory(self._addon_handle, True)
     
@@ -418,10 +459,7 @@ class CloudDriveAddon:
     
     def new_change_token_slideshow(self, change_token, driveid, item_driveid=None, item_id=None, path=None):
         self.get_provider().configure(self._account_manager, driveid)
-        item = self.get_provider().get_item(item_driveid, item_id, path)
-        if self.cancel_operation():
-            return
-        return item['folder']['child_count']
+        return self.get_provider().folder_signature(item_driveid, item_id, path)
     
     def _slideshow(self, driveid, item_driveid=None, item_id=None, path=None, change_token=None):
         new_change_token = self.new_change_token_slideshow(change_token, driveid, item_driveid, item_id, path)
@@ -430,13 +468,13 @@ class CloudDriveAddon:
         wait_for_slideshow = False
         if not change_token or change_token != new_change_token:
             Logger.notice('Slideshow will start. change_token: %s, new_change_token: %s' % (change_token, new_change_token))
-            params = {'action':'_list_folder', 'content_type': self._content_type,
+            params = {'action':'_list_folder', 'content_type': self._content_type, 'fresh': 'true',
                       'item_driveid': Utils.default(item_driveid, ''), 'item_id': Utils.default(item_id, ''), 'driveid': driveid, 'path' : Utils.default(path, '')}
             extra_params = ',recursive' if self._addon.getSetting('slideshow_recursive') == 'true' else ''
             KodiUtils.executebuiltin('SlideShow('+self._addon_url + '?' + urllib.parse.urlencode(params) + extra_params + ')')
             wait_for_slideshow = True
         else:
-            Logger.notice('Slideshow child count is the same, nothing to refresh...')
+            Logger.notice('Slideshow folder did not change, nothing to refresh...')
         t = threading.Thread(target=self._refresh_slideshow, args=(driveid, item_driveid, item_id, path, new_change_token, wait_for_slideshow,), daemon=True)
         t.start()
     
@@ -569,6 +607,7 @@ class CloudDriveAddon:
         Cache(self._addonid, 'page', 0).clear()
         Cache(self._addonid, 'children', 0).clear()
         Cache(self._addonid, 'items', 0).clear()
+        Cache(self._addonid, 'listing', 0).clear()
         
     def _rename_action(self):
         pass
