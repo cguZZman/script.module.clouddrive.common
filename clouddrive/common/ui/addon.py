@@ -23,6 +23,7 @@ import sys
 import threading
 import time
 import urllib
+from concurrent.futures import ThreadPoolExecutor
 
 from clouddrive.common.account import AccountManager
 from clouddrive.common.exception import ExceptionUtils, RequestException
@@ -30,6 +31,7 @@ from clouddrive.common.export import ExportManager
 from clouddrive.common.remote.request import Request
 from clouddrive.common.service.download import DownloadServiceUtil
 from clouddrive.common.ui.dialog import DialogProgress, DialogProgressBG, ExportMainDialog
+from clouddrive.common.ui import nfo
 from clouddrive.common.ui.errors import ErrorMessage, ErrorMessages
 from clouddrive.common.ui.signin import AccountSignin
 from clouddrive.common.ui.logger import Logger
@@ -355,6 +357,8 @@ class CloudDriveAddon:
             listing = {'items': page[0], 'next_page_token': page[1]}
             if cache:
                 cache.set(key, listing)
+        if self._content_type == 'video' and KodiUtils.get_addon_setting('nfo_info') != 'false':
+            self._add_nfo_info(driveid, listing['items'])
         next_page_url = None
         if listing['next_page_token']:
             params = {'action': '_list_folder', 'content_type': self._content_type, 'driveid': driveid, 'page_token': listing['next_page_token']}
@@ -364,6 +368,70 @@ class CloudDriveAddon:
             next_page_url = self._addon_url + '?' + urllib.parse.urlencode(params)
         self._process_items(listing['items'], driveid, next_page_url)
         
+    # .nfo files read at once while browsing.
+    _NFO_THREADS = 4
+
+    def _add_nfo_info(self, driveid, items):
+        # The plot, cast and artwork of each video from the .nfo and pictures next to it, as Kodi's library shows them.
+        found = nfo.find(items, self._video_file_extensions)
+        if not found:
+            return
+        # A file's .nfo is read again only when it changes.
+        cache = Cache(self._addonid, 'nfo', timedelta(days=30))
+        files = dict((match['nfo']['id'], match['nfo']) for match in found.values() if match['nfo'])
+        parsed = {}
+        unread = []
+        for f in files.values():
+            key = '|'.join(Utils.str(value) for value in (driveid, f['id'], f['last_modified_date'], f['size']))
+            cached = cache.get(key)
+            if cached is not None:
+                parsed[f['id']] = cached
+            elif f['size'] <= nfo.MAX_SIZE:
+                unread.append((key, f))
+
+        def read(entry):
+            key, f = entry
+            if self.cancel_operation():
+                return None
+            try:
+                return key, f['id'], Utils.default(nfo.parse(nfo.decode(self._read_file(driveid, f))), {})
+            except Exception as e:
+                # Shown without it; read again next time.
+                Logger.notice('The .nfo file could not be read: %s' % Utils.str(e))
+                return None
+
+        # The first one alone: it refreshes the access token if needed, once, before the others share it.
+        results = [read(unread[0])] if unread else []
+        if len(unread) > 1:
+            with ThreadPoolExecutor(self._NFO_THREADS) as pool:
+                results.extend(pool.map(read, unread[1:]))
+        for result in results:
+            if result:
+                key, file_id, info = result
+                cache.set(key, info)
+                parsed[file_id] = info
+        for item in items:
+            match = found.get(item['id'])
+            if not match:
+                continue
+            info = parsed.get(match['nfo']['id'], {}) if match['nfo'] else {}
+            art = dict(Utils.get_safe_value(info, 'art', {}))
+            for art_type, image in match['art'].items():
+                image_driveid = Utils.default(Utils.get_safe_value(image, 'drive_id'), driveid)
+                art[art_type] = self._get_item_play_url(image['name'], driveid, image_driveid, image['id'])
+            item['nfo'] = {'info': Utils.get_safe_value(info, 'info', {}), 'cast': Utils.get_safe_value(info, 'cast', []), 'art': art}
+
+    def _read_file(self, driveid, item):
+        provider = self.get_provider()
+        item = provider.get_item(Utils.default(Utils.get_safe_value(item, 'drive_id'), driveid), item['id'], include_download_info=True)
+        url = item['download_info']['url']
+        # One try: a file that fails is shown without its .nfo.
+        if provider.download_requires_auth:
+            request = provider.prepare_request('get', url, request_params={'tries': 1})
+        else:
+            request = Request(url, None, tries=1)
+        return request.request()
+
     def _process_items(self, items, driveid, next_page_url=None):
         listing = []
         for item in items:
@@ -408,9 +476,17 @@ class CloudDriveAddon:
                     info_type = 'music'
                 elif 'video' in item:
                     list_item.addStreamInfo('video', item['video'])
+                nfo_info = Utils.get_safe_value(item, 'nfo')
+                if nfo_info and info_type == 'video':
+                    info.update(nfo_info['info'])
                 list_item.setInfo(info_type, info)
                 if 'thumbnail' in item:
                     list_item.setArt({'icon': item['thumbnail'], 'thumb': item['thumbnail']})
+                if nfo_info and info_type == 'video':
+                    if nfo_info['art']:
+                        list_item.setArt(nfo_info['art'])
+                    if nfo_info['cast']:
+                        list_item.setCast(nfo_info['cast'])
             elif ('image' in item or (item_name_extension and item_name_extension in self._image_file_extensions)) and self._content_type == 'image':
                 Logger.debug('image in item: %s' % (Utils.str('image' in item)),)
                 Logger.debug('item_name_extension in self._image_file_extensions: %s' % (Utils.str(item_name_extension in self._image_file_extensions),))
@@ -622,6 +698,7 @@ class CloudDriveAddon:
         Cache(self._addonid, 'children', 0).clear()
         Cache(self._addonid, 'items', 0).clear()
         Cache(self._addonid, 'listing', 0).clear()
+        Cache(self._addonid, 'nfo', 0).clear()
         
     def _rename_action(self):
         pass
