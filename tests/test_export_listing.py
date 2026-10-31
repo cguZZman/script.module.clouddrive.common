@@ -67,3 +67,46 @@ class ExportListingTest(unittest.TestCase):
         p, q = TreeProvider(TREE), TreeProvider(TREE)
         p.get_export_folder_items('d', 'root')
         self.assertNotIn('_subtree_cache', q.__dict__)
+
+
+class RemovedAccountTest(unittest.TestCase):
+    """plugin.googledrive#349: an export whose account was removed raised "Unknown error: <drive id>" every minute."""
+
+    def service(self):
+        from unittest import mock
+        from clouddrive.common.account import AccountManager
+        from clouddrive.common.service.export import ExportService
+        service = object.__new__(ExportService)
+        service._skipped_exports = set()
+        service._common_addon = mock.MagicMock(getLocalizedString=lambda string_id: "Export '%s' skipped")
+        service._account_manager = mock.MagicMock(get_by_driveid=lambda return_type, driveid: AccountManager.get_by_driveid(AccountManager.__new__(AccountManager), return_type, driveid, accounts={'a': {'drives': [{'id': 'kept'}]}}))
+        service.provider = mock.MagicMock()
+        service._export_progress_dialog_bg = mock.MagicMock()
+        service.export_manager = mock.MagicMock()
+        service.export_manager.get_exports.return_value = {
+            'e1': {'id': 'e1', 'name': 'Movies', 'driveid': 'removed', 'watch': True},
+            'e2': {'id': 'e2', 'name': 'Shows', 'driveid': 'kept', 'watch': True}}
+        service.export_manager.get_retry_changes.return_value = []
+        service.export_manager.get_items_info.return_value = None
+        service.run_export = mock.MagicMock()
+        return service
+
+    def test_skipped_with_one_notification(self):
+        from unittest import mock
+        service = self.service()
+        with mock.patch('clouddrive.common.service.export.KodiUtils.show_notification') as notify:
+            service.process_watch()
+            service.process_watch()
+        notify.assert_called_once_with("Export 'Movies' skipped")
+        service.provider.configure.assert_not_called()
+        self.assertFalse(service.export_manager.save_export.called, 'the export is not marked as exporting')
+        self.assertEqual([c[0][0]['id'] for c in service.run_export.call_args_list], ['e2', 'e2'], 'the other export still runs')
+
+    def test_scheduled_runs_are_skipped_too(self):
+        from unittest import mock
+        from clouddrive.common.service.export import ExportService
+        service = self.service()
+        with mock.patch('clouddrive.common.service.export.KodiUtils.show_notification') as notify:
+            ExportService.run_export(service, service.export_manager.get_exports()['e1'])
+        notify.assert_called_once_with("Export 'Movies' skipped")
+        service.export_manager.save_export.assert_not_called()
