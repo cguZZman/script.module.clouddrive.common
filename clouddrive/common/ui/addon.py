@@ -370,6 +370,10 @@ class CloudDriveAddon:
         
     # .nfo files read at once while browsing.
     _NFO_THREADS = 4
+    # Seconds to wait for each request while reading them, and for all of them: the files not read by then are read
+    # the next time the folder is opened.
+    _NFO_REQUEST_TIMEOUT = 5
+    _NFO_TIME_LIMIT = 10
 
     def _add_nfo_info(self, driveid, items):
         # The plot, cast and artwork of each video from the .nfo and pictures next to it, as Kodi's library shows them.
@@ -389,9 +393,11 @@ class CloudDriveAddon:
             elif f['size'] <= nfo.MAX_SIZE:
                 unread.append((key, f))
 
+        deadline = time.time() + self._NFO_TIME_LIMIT
+
         def read(entry):
             key, f = entry
-            if self.cancel_operation():
+            if self.cancel_operation() or time.time() > deadline:
                 return None
             try:
                 return key, f['id'], Utils.default(nfo.parse(nfo.decode(self._read_file(driveid, f))), {})
@@ -401,10 +407,16 @@ class CloudDriveAddon:
                 return None
 
         # The first one alone: it refreshes the access token if needed, once, before the others share it.
-        results = [read(unread[0])] if unread else []
-        if len(unread) > 1:
-            with ThreadPoolExecutor(self._NFO_THREADS) as pool:
-                results.extend(pool.map(read, unread[1:]))
+        provider = self.get_provider()
+        request_timeout = provider.request_timeout
+        provider.request_timeout = self._NFO_REQUEST_TIMEOUT
+        try:
+            results = [read(unread[0])] if unread else []
+            if len(unread) > 1:
+                with ThreadPoolExecutor(self._NFO_THREADS) as pool:
+                    results.extend(pool.map(read, unread[1:]))
+        finally:
+            provider.request_timeout = request_timeout
         for result in results:
             if result:
                 key, file_id, info = result
@@ -429,7 +441,7 @@ class CloudDriveAddon:
         if provider.download_requires_auth:
             request = provider.prepare_request('get', url, request_params={'tries': 1})
         else:
-            request = Request(url, None, tries=1)
+            request = Request(url, None, tries=1, timeout=self._NFO_REQUEST_TIMEOUT)
         return request.request()
 
     def _process_items(self, items, driveid, next_page_url=None):

@@ -136,8 +136,10 @@ class FakeProvider(Provider):
         super(FakeProvider, self).__init__('fake')
         self.files = files
         self.reads = []
+        self.timeouts = []
 
     def get_item(self, item_driveid=None, item_id=None, path=None, find_subtitles=False, include_download_info=False):
+        self.timeouts.append(self.request_timeout)
         return {'id': item_id, 'download_info': {'url': 'https://files.example.com/' + item_id}}
 
 
@@ -157,6 +159,7 @@ class BrowsingTest(unittest.TestCase):
         request = mock.MagicMock()
         file_id = url.rsplit('/', 1)[-1]
         self.provider.reads.append(file_id)
+        self.provider.timeouts.append(kwargs.get('timeout'))
         request.request.return_value = self.provider.files[file_id]
         return request
 
@@ -190,6 +193,21 @@ class BrowsingTest(unittest.TestCase):
         items = self.add([item('Broken.mkv'), item('Broken.nfo'), item('Big.mkv'), item('Big.nfo', size=nfo.MAX_SIZE + 1)])
         self.assertEqual(items[0]['nfo']['info'], {})
         self.assertEqual(self.provider.reads, ['id-Broken.nfo'], 'big ones are not read')
+
+    def test_requests_have_a_timeout(self):
+        self.add([item('Movie.mkv'), item('Movie.nfo')])
+        self.assertEqual(self.provider.timeouts, [5, 5], 'the item and its download')
+        self.assertIsNone(self.provider.request_timeout, 'other requests keep theirs')
+
+    def test_reads_stop_at_the_time_limit(self):
+        self.addon._NFO_TIME_LIMIT = -1
+        items = self.add([item('Movie.mkv'), item('Movie.nfo'), item('Movie-poster.jpg')])
+        self.assertEqual(self.provider.reads, [])
+        self.assertEqual(items[0]['nfo']['info'], {}, 'shown without it')
+        self.assertIn('poster', items[0]['nfo']['art'])
+        del self.addon._NFO_TIME_LIMIT
+        self.add([item('Movie.mkv'), item('Movie.nfo')])
+        self.assertEqual(self.provider.reads, ['id-Movie.nfo'], 'read the next time')
 
     def test_listing_shows_it(self):
         settings = {'page_size': '0', 'nfo_info': 'true'}

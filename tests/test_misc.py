@@ -3,6 +3,7 @@ from unittest import mock
 
 import kodistubs
 from clouddrive.common.redaction import redact
+from clouddrive.common.remote.request import Request
 from clouddrive.common.ui.addon import CloudDriveAddon
 from clouddrive.common.utils import Utils
 
@@ -18,6 +19,14 @@ class RedactionTest(unittest.TestCase):
         text = redact('token=1%2F%2Fsecret-refresh&page_token=next')
         self.assertNotIn('secret-refresh', text)
         self.assertIn('page_token=next', text)
+
+
+class RequestTimeoutTest(unittest.TestCase):
+    def test_timeout_only_when_set(self):
+        for timeout, expected in ((None, {}), (5, {'timeout': 5})):
+            with mock.patch('urllib.request.urlopen', side_effect=OSError('offline')) as urlopen, self.assertRaises(Exception):
+                Request('https://example.com/', None, tries=1, timeout=timeout).request()
+            self.assertEqual(urlopen.call_args.kwargs, expected)
 
 
 class SourceIdTest(unittest.TestCase):
