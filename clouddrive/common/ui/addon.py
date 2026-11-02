@@ -674,7 +674,11 @@ class CloudDriveAddon:
         rex = ExceptionUtils.extract_exception(ex, RequestException)
         signin_server = KodiUtils.get_signin_server()
         driveid = Utils.get_safe_value(self._addon_params, 'driveid')
-        message = ErrorMessages(self._common_addon, signin_server).describe(
+        try:
+            token_url = self.get_provider().own_client_token_url
+        except Exception:
+            token_url = None
+        message = ErrorMessages(self._common_addon, signin_server, token_url).describe(
             ex, bool(driveid), self._signin.ip_before_pin if self._signin else None,
             lambda: Request(signin_server + '/ip', None).request())
         add_account_cmd = 'RunPlugin('+self._addon_url + '?' + urllib.parse.urlencode({'action':'_add_account', 'content_type': self._content_type})+')'

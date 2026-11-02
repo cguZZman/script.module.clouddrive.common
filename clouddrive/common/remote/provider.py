@@ -19,8 +19,10 @@
 
 import hashlib
 import time
+import urllib.parse
 
 from clouddrive.common.remote.oauth2 import OAuth2
+from clouddrive.common.remote.request import Request
 from clouddrive.common.remote.signin import Signin
 from clouddrive.common.utils import Utils
 
@@ -69,6 +71,10 @@ class Provider(OAuth2):
     download_requires_auth = False
     # Providers that implement get_folder_page: browsing in the add-on then lists folders a page at a time.
     folder_paging_supported = False
+    # The provider's token endpoint, for providers whose users can sign in with their own OAuth app: the sign-in
+    # server then hands Kodi that app's client_id and client_secret with the tokens, and Kodi refreshes them here
+    # itself. None when users always sign in with the sign-in server's app.
+    own_client_token_url = None
     _signin = Signin()
     _account_manager = None
     _driveid = None
@@ -79,7 +85,7 @@ class Provider(OAuth2):
         self.source_mode = source_mode
         
     def create_pin(self, request_params=None):
-        return self._signin.create_pin(self.name, request_params)
+        return self._signin.create_pin(self.name, request_params, own_client=bool(self.own_client_token_url))
     
     def register_networks(self, pin_info):
         return self._signin.register_networks(pin_info)
@@ -116,11 +122,21 @@ class Provider(OAuth2):
     
     def refresh_access_tokens(self, request_params=None):
         tokens = self.get_access_tokens()
-        tokens_info = self._signin.refresh_tokens(self.name, tokens['refresh_token'], request_params)
+        if self.uses_own_client(tokens):
+            body = urllib.parse.urlencode({'client_id': tokens['client_id'], 'client_secret': tokens['client_secret'],
+                                           'grant_type': 'refresh_token', 'refresh_token': tokens['refresh_token']})
+            headers = {'content-type': 'application/x-www-form-urlencoded'}
+            tokens_info = Request(self.own_client_token_url, body, headers, **Utils.default(request_params, {})).request_json()
+        else:
+            tokens_info = self._signin.refresh_tokens(self.name, tokens['refresh_token'], request_params)
         if tokens_info:
             tokens_info['date'] = time.time()
         return tokens_info
     
+    def uses_own_client(self, tokens):
+        """True when the account signed in with the user's own OAuth app, whose tokens Kodi refreshes itself."""
+        return bool(self.own_client_token_url and Utils.get_safe_value(tokens, 'client_id') and Utils.get_safe_value(tokens, 'client_secret'))
+
     def persist_access_tokens(self, access_tokens):
         account = self._account_from_manager()
         account['access_tokens'] = access_tokens
