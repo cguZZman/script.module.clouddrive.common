@@ -1,3 +1,4 @@
+import time
 import unittest
 import urllib.parse
 from unittest import mock
@@ -101,3 +102,77 @@ class ErrorTest(unittest.TestCase):
         self.assertEqual(ErrorMessages(kodistubs.FakeAddon(), 'https://signin.example.com', TOKEN_URL).describe(error, True).ask,
                          ErrorMessage.SIGN_IN_AGAIN)
         self.assertIsNone(ErrorMessages(kodistubs.FakeAddon(), 'https://signin.example.com').describe(error, True).ask)
+
+
+class RefusedRefreshTest(unittest.TestCase):
+    SERVER = 'https://signin.example.com'
+
+    def setUp(self):
+        self.signin = mock.MagicMock()
+        self.patches = [mock.patch.object(provider_module.KodiUtils, 'get_signin_server', staticmethod(lambda: self.SERVER)),
+                        mock.patch.object(provider_module, 'Request', FakeRequest)]
+        for patch in self.patches:
+            patch.start()
+        FakeRequest.sent = []
+
+    def tearDown(self):
+        for patch in self.patches:
+            patch.stop()
+
+    def provider(self, tokens):
+        provider = OwnClientProvider(tokens)
+        provider._signin = self.signin
+        return provider
+
+    def refuse(self, code, body):
+        self.signin.refresh_tokens.side_effect = request_error(self.SERVER + '/refresh', code, body)
+
+    def test_a_refused_token_is_not_sent_again(self):
+        self.refuse(401, '{"status":401,"error":"unauthorized_client"}')
+        provider = self.provider(dict((k, v) for k, v in OWN_TOKENS.items() if not k.startswith('client_')))
+        for _ in range(3):
+            with self.assertRaises(Exception) as raised:
+                provider.prepare_request('get', '/files')
+            self.assertEqual(ErrorMessages(kodistubs.FakeAddon(), self.SERVER).describe(raised.exception, True).ask,
+                             ErrorMessage.SIGN_IN_AGAIN, 'asks to sign in again')
+        self.assertEqual(self.signin.refresh_tokens.call_count, 1)
+        self.assertEqual((provider.saved[-1]['refresh_refused']['error'], provider.saved[-1]['refresh_refused']['status']),
+                         ('unauthorized_client', 401))
+
+    def test_asks_again_a_day_later_and_a_refresh_that_works_clears_the_refusal(self):
+        self.refuse(400, '{"status":400,"error":"invalid_grant"}')
+        provider = self.provider(dict((k, v) for k, v in OWN_TOKENS.items() if not k.startswith('client_')))
+        with self.assertRaises(Exception):
+            provider.prepare_request('get', '/files')
+        self.signin.refresh_tokens.side_effect = None
+        self.signin.refresh_tokens.return_value = {'access_token': 'new', 'expires_in': 3599}
+        later = time.time() + Provider.REFUSED_RETRY_S
+        with mock.patch.object(provider_module.time, 'time', lambda: later):
+            provider.prepare_request('get', '/files')
+        self.assertEqual(self.signin.refresh_tokens.call_count, 2)
+        self.assertIsNone(provider.saved[-1]['refresh_refused'])
+        self.assertEqual(provider.saved[-1]['access_token'], 'new')
+
+    def test_other_errors_are_not_remembered(self):
+        provider = self.provider(dict((k, v) for k, v in OWN_TOKENS.items() if not k.startswith('client_')))
+        for code, body in ((401, '{"error":"invalid_client"}'), (503, '{"error":"unavailable"}'), (400, 'Bad request'),
+                           (403, '{"error":"invalid_grant"}')):
+            self.refuse(code, body)
+            with self.assertRaises(Exception):
+                provider.prepare_request('get', '/files')
+        self.assertEqual(self.signin.refresh_tokens.call_count, 4)
+        self.assertEqual(provider.saved, [])
+
+    def test_own_app_refusals_are_remembered(self):
+        class RefusingRequest(FakeRequest):
+            def request_json(self):
+                raise request_error(TOKEN_URL, 400, '{"error": "invalid_grant", "error_description": "Bad Request"}')
+
+        provider = self.provider(OWN_TOKENS)
+        with mock.patch.object(provider_module, 'Request', RefusingRequest):
+            for _ in range(2):
+                with self.assertRaises(Exception) as raised:
+                    provider.prepare_request('get', '/files')
+        self.assertEqual(len(FakeRequest.sent), 1)
+        self.assertEqual(ErrorMessages(kodistubs.FakeAddon(), self.SERVER, TOKEN_URL).describe(raised.exception, True).ask,
+                         ErrorMessage.SIGN_IN_AGAIN)
