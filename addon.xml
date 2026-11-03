@@ -42,11 +42,7 @@ v1.5.15 released Oct 30, 2026:
 - Dropbox shows a drive's exports after its files
 
 v1.5.14 released Oct 30, 2026:
-- Exports whose account was removed are skipped with one notice, instead of an "Unknown error" every minute
-
-v1.5.13 released Oct 30, 2026:
-- Big folders open a page at a time (Items per page in each add-on's Advanced settings), and going back to a folder doesn't load it again for a few minutes
-- Auto-refreshed slideshow: shows every picture of the folder, and notices replaced pictures</news>
+- Exports whose account was removed are skipped with one notice, instead of an "Unknown error" every minute</news>
 		<disclaimer lang="en_GB">
 This cloud drive addon uses a third-party authentication mechanism commonly known as OAuth 2.0.
 If you want to know more about OAuth 2.0 you can visit the following pages:
